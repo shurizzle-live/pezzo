@@ -1,0 +1,42 @@
+[workspace]
+members = [".", "crypt"]
+
+[package]
+name = "pezzo"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+
+[features]
+nightly = [
+  "syscalls/mips",
+  "syscalls/mips64",
+  "syscalls/powerpc",
+  "syscalls/powerpc64",
+  "syscalls/s390x",
+]
+
+[target.'cfg(unix)'.dependencies]
+atoi = "2.0.0"
+memchr = "2.5.0"
+zeroize = { version = "1.5.7", features = ["zeroize_derive"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+syscalls = { version = "0.6.7", default-features = false, features = [
+  "std",
+  "aarch64",
+  "arm",
+  "sparc",
+  "sparc64",
+  "x86",
+  "x86_64",
+] }
+ctor = "0.1.26"
+
+[target.'cfg(all(unix, not(target_os = "linux")))'.dependencies]
+libc = "0.2.140"
