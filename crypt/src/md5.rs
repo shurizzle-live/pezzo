@@ -2,6 +2,7 @@ use core::{borrow::Borrow, mem::MaybeUninit, ops::Deref};
 
 use crate::util::to_64;
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Salt<'a>(&'a [u8]);
 
 impl<'a> Salt<'a> {
@@ -44,6 +45,7 @@ impl<'a> Borrow<[u8]> for Salt<'a> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Key<'a>(&'a [u8]);
 
 impl<'a> Key<'a> {

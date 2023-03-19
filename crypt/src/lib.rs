@@ -6,3 +6,6 @@ pub(crate) mod sha;
 pub mod sha256;
 pub mod sha512;
 pub(crate) mod util;
+mod verify;
+
+pub use verify::verify;
