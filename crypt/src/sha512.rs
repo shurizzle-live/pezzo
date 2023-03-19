@@ -1,12 +1,12 @@
 use core::mem::MaybeUninit;
 
-use sha2::{digest::Output, Digest, Sha512};
+use sha2::{digest::Output as Out, Digest, Sha512};
 
-use crate::{sha::Key, util::to_64};
+use crate::util::to_64;
 
-pub use crate::{md5::Salt, sha::Rounds};
+pub use crate::sha::{Key, Rounds, Salt, Sha256Output as Output, Sha512Builder as Builder};
 
-fn hashmd(ctx: &mut Sha512, md: &Output<Sha512>, n: usize) {
+fn hashmd(ctx: &mut Sha512, md: &Out<Sha512>, n: usize) {
     let (div, rem) = (n / 64, n % 64);
     for _ in 0..div {
         ctx.update(md.as_slice());
@@ -120,12 +120,12 @@ mod tests {
     #[test]
     fn test() {
         assert_eq!(
-            &crypt(
-                unsafe { Rounds::new_unchecked(1234) },
-                unsafe { Salt::new_unchecked(b"abc0123456789") },
-                unsafe { Key::new_unchecked(b"Xy01@#\x01\x02\x80\x7f\xff\r\n\x81\t !") }
-            ),
-            b"BCpt8zLrc/RcyuXmCDOE1ALqMXB2MH6n1g891HhFj8.w7LxGv.FTkqq6Vxc/km3Y0jE0j24jY5PIv/oOu6reg1"
+            Builder::new()
+                .with_rounds(unsafe { Rounds::new_unchecked(1234) })
+                .with_salt(unsafe { Salt::new_unchecked(b"abc0123456789") })
+                .build(unsafe { Key::new_unchecked(b"Xy01@#\x01\x02\x80\x7f\xff\r\n\x81\t !") })
+                .as_slice(),
+            b"$6$rounds=1234$abc0123456789$BCpt8zLrc/RcyuXmCDOE1ALqMXB2MH6n1g891HhFj8.w7LxGv.FTkqq6Vxc/km3Y0jE0j24jY5PIv/oOu6reg1"
         );
     }
 }
