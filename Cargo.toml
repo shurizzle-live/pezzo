@@ -3,7 +3,7 @@ members = [".", "crypt"]
 
 [package]
 name = "pezzo"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 
 [profile.release]
@@ -25,6 +25,7 @@ nightly = [
 atoi = "2.0.0"
 memchr = "2.5.0"
 zeroize = { version = "1.5.7", features = ["zeroize_derive"] }
+crypt = { path = "crypt" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 syscalls = { version = "0.6.7", default-features = false, features = [

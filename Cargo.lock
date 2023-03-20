@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "crypt"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "atoi",
  "base64",
@@ -145,9 +145,10 @@ dependencies = [
 
 [[package]]
 name = "pezzo"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "atoi",
+ "crypt",
  "ctor",
  "libc",
  "memchr",
