@@ -4,7 +4,16 @@ pub fn verify<B1: AsRef<[u8]>, B2: AsRef<[u8]>>(hash: B1, key: B2) -> bool {
 
 #[inline(always)]
 fn _verify<B1: AsRef<[u8]>, B2: AsRef<[u8]>>(hash: B1, key: B2) -> Option<bool> {
-    fn parse_sha(hash: &[u8]) -> Option<(Option<u32>, &[u8], &[u8])> {
+    #[inline(always)]
+    fn parse_sha<'a, F1, F2, T1, T2>(
+        hash: &'a [u8],
+        roundsfn: F1,
+        saltfn: F2,
+    ) -> Option<(Option<T1>, T2, &'a [u8])>
+    where
+        F1: FnOnce(u32) -> Option<T1>,
+        F2: FnOnce(&'a [u8]) -> Option<T2>,
+    {
         let hash = hash.strip_prefix(b"$")?;
 
         let (rounds, hash) = if let Some(hash) = hash.strip_prefix(b"rounds=") {
@@ -16,12 +25,12 @@ fn _verify<B1: AsRef<[u8]>, B2: AsRef<[u8]>>(hash: B1, key: B2) -> Option<bool> 
             }
             let hash = unsafe { hash.get_unchecked(len..) }.strip_prefix(b"$")?;
 
-            (Some(rounds), hash)
+            (Some(roundsfn(rounds)?), hash)
         } else {
             (None, hash)
         };
         let i = memchr::memchr(b'$', hash)?;
-        let salt = hash.get(..i)?;
+        let salt = saltfn(hash.get(..i)?)?;
         let hash = hash.get((i + 1)..)?;
         Some((rounds, salt, hash))
     }
@@ -70,21 +79,17 @@ fn _verify<B1: AsRef<[u8]>, B2: AsRef<[u8]>>(hash: B1, key: B2) -> Option<bool> 
             Some(crate::blowfish::crypt(flags, rounds, salt, key).as_slice() == hash)
         }
         b'5' => {
-            let (rounds, salt, hash) = parse_sha(hash)?;
-            let rounds = rounds
-                .and_then(crate::sha256::Rounds::new)
-                .unwrap_or(crate::sha256::Rounds::default());
-            let salt = crate::sha256::Salt::new(salt)?;
+            let (rounds, salt, hash) =
+                parse_sha(hash, crate::sha256::Rounds::new, crate::sha256::Salt::new)?;
+            let rounds = rounds.unwrap_or(crate::sha256::Rounds::default());
             let key = crate::sha256::Key::new(key.as_ref())?;
 
             Some(crate::sha256::crypt(rounds, salt, key).as_slice() == hash)
         }
         b'6' => {
-            let (rounds, salt, hash) = parse_sha(hash)?;
-            let rounds = rounds
-                .and_then(crate::sha512::Rounds::new)
-                .unwrap_or(crate::sha512::Rounds::default());
-            let salt = crate::sha512::Salt::new(salt)?;
+            let (rounds, salt, hash) =
+                parse_sha(hash, crate::sha512::Rounds::new, crate::sha512::Salt::new)?;
+            let rounds = rounds.unwrap_or(crate::sha512::Rounds::default());
             let key = crate::sha512::Key::new(key.as_ref())?;
 
             Some(crate::sha512::crypt(rounds, salt, key).as_slice() == hash)
