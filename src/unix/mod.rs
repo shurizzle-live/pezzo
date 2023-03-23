@@ -4,10 +4,10 @@ pub mod tty;
 #[cfg(target_os = "linux")]
 #[macro_use]
 pub mod linux;
+#[cfg(target_os = "macos")]
+pub mod macos;
 use std::{ffi::CStr, io, path::Path};
 
-#[cfg(not(target_os = "linux"))]
-pub use common::uname::*;
 mod process;
 
 pub use process::*;

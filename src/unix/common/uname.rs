@@ -30,6 +30,7 @@ impl utsname {
         unsafe { CStr::from_ptr(self.0.machine.as_ptr() as *const _) }
     }
 
+    #[cfg(target_os = "linux")]
     #[inline]
     pub fn domainname(&self) -> &CStr {
         unsafe { CStr::from_ptr(self.0.domainname.as_ptr() as *const _) }
@@ -38,17 +39,24 @@ impl utsname {
 
 impl fmt::Debug for utsname {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("utsname")
-            .field("sysname", &self.sysname())
+        let mut dbg = f.debug_struct("utsname");
+        dbg.field("sysname", &self.sysname())
             .field("nodename", &self.nodename())
             .field("release", &self.release())
             .field("version", &self.version())
-            .field("machine", &self.machine())
-            .field("domainname", &self.domainname())
-            .finish()
+            .field("machine", &self.machine());
+        #[cfg(target_os = "linux")]
+        {
+            dbg.field("domainname", &self.domainname()).finish()
+        }
+        #[cfg(target_os = "macos")]
+        {
+            dbg.finish()
+        }
     }
 }
 
+#[allow(dead_code)]
 pub fn uname() -> io::Result<utsname> {
     unsafe {
         let mut buf = MaybeUninit::<utsname>::uninit();
