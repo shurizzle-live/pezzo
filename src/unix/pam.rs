@@ -1,4 +1,6 @@
-use std::{ffi::CStr, io::Write, mem::MaybeUninit, ptr};
+#![allow(non_camel_case_types)]
+
+use std::{ffi::CStr, io::Write, ptr};
 
 use super::Context;
 
@@ -64,10 +66,12 @@ unsafe extern "C" fn conversation(
 
         match msg.msg_style {
             1 => {
-                _ = ctx
-                    .tty_out()
-                    .write_all(CStr::from_ptr(msg.msg as *const _).to_bytes());
-                _ = ctx.tty_out().flush();
+                if !msg.msg.is_null() {
+                    _ = ctx
+                        .tty_out()
+                        .write_all(CStr::from_ptr(msg.msg as *const _).to_bytes());
+                    _ = ctx.tty_out().flush();
+                }
                 let timeout = ctx.prompt_timeout();
                 match ctx.tty_in().c_readline_noecho(timeout) {
                     Ok(buf) => {
@@ -81,10 +85,12 @@ unsafe extern "C" fn conversation(
                 }
             }
             2 => {
-                _ = ctx
-                    .tty_out()
-                    .write_all(CStr::from_ptr(msg.msg as *const _).to_bytes());
-                _ = ctx.tty_out().flush();
+                if !msg.msg.is_null() {
+                    _ = ctx
+                        .tty_out()
+                        .write_all(CStr::from_ptr(msg.msg as *const _).to_bytes());
+                    _ = ctx.tty_out().flush();
+                }
                 let timeout = ctx.prompt_timeout();
                 match ctx.tty_in().c_readline(timeout) {
                     Ok(buf) => {
@@ -98,10 +104,12 @@ unsafe extern "C" fn conversation(
                 }
             }
             3 | 4 => {
-                _ = ctx
-                    .tty_out()
-                    .write(CStr::from_ptr(msg.msg as *const _).to_bytes());
-                _ = ctx.tty_out().flush();
+                if !msg.msg.is_null() {
+                    _ = ctx
+                        .tty_out()
+                        .write(CStr::from_ptr(msg.msg as *const _).to_bytes());
+                    _ = ctx.tty_out().flush();
+                }
             }
             _ => {
                 res.resp = ptr::null_mut();

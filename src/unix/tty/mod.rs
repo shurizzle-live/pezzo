@@ -2,14 +2,12 @@ use std::{
     fmt,
     fs::File,
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    mem::{self, MaybeUninit},
+    mem::MaybeUninit,
     os::fd::{AsFd, AsRawFd, FromRawFd, IntoRawFd, RawFd},
     path::{Path, PathBuf},
     ptr,
     sync::Arc,
 };
-
-use zeroize::Zeroizing;
 
 use super::common::CBuffer;
 
