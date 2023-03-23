@@ -18,7 +18,7 @@ const TTY_USB_MAJOR: u32 = 188;
 
 const VALID_TTY_MAJOR: [u32; 4] = [TTY_MAJOR, PTS_MAJOR, TTY_ACM_MAJOR, TTY_USB_MAJOR];
 
-pub fn find_by_ttynr(ttynr: u32) -> io::Result<TtyInfo> {
+fn find_by_ttynr(ttynr: u32) -> io::Result<TtyInfo> {
     {
         let tty_major = (ttynr >> 8) & 0xFF;
         if !VALID_TTY_MAJOR.contains(&tty_major) {
@@ -85,4 +85,11 @@ pub fn find_by_ttynr(ttynr: u32) -> io::Result<TtyInfo> {
     }
 
     Err(io::Error::new(io::ErrorKind::NotFound, "tty not found"))
+}
+
+impl super::super::tty::TtyInfo {
+    #[inline]
+    pub fn for_ttyno(ttyno: u32) -> io::Result<Self> {
+        find_by_ttynr(ttyno)
+    }
 }

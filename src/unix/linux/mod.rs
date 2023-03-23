@@ -1,11 +1,9 @@
-pub mod noecho;
 pub mod proc;
 pub mod tty;
-pub mod uname;
+
+pub use proc::context::*;
 
 use std::fmt;
-
-use syscalls::{syscall, Sysno};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
@@ -60,7 +58,7 @@ fn _kernel_version_ctor() {
     pub fn _get_kernel_version() -> Option<Version> {
         use atoi::FromRadix10;
 
-        let uts = uname::uname().ok()?;
+        let uts = super::common::uname().ok()?;
         let release = uts.release().to_bytes();
 
         let (major, length) = u32::from_radix_10(release);
@@ -92,8 +90,8 @@ fn _kernel_version_ctor() {
             KERNEL_VERSION = v;
         } else {
             const ERRMSG: &[u8] = b"Invalid kernel version\n\0";
-            _ = syscall!(Sysno::write, 2, ERRMSG.as_ptr(), ERRMSG.len() - 1);
-            _ = syscall!(Sysno::exit, 1);
+            _ = libc::write(2, ERRMSG.as_ptr() as *const libc::c_void, ERRMSG.len() - 1);
+            libc::exit(1);
         }
     }
 }

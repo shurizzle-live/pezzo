@@ -1,29 +1,17 @@
-use std::io::{self, Write};
+use std::ffi::CStr;
 
-use pezzo::unix::tty::{TtyIn, TtyOut};
-use zeroize::Zeroizing;
+use pezzo::unix::Context;
 
 extern crate pezzo;
 
-fn prompt_password<P>(
-    prompt: P,
-    writer: &mut TtyOut,
-    reader: &mut TtyIn,
-) -> io::Result<Zeroizing<Box<[u8]>>>
-where
-    P: AsRef<[u8]>,
-{
-    writer.write_all(prompt.as_ref())?;
-    writer.flush()?;
-    reader.read_password()
-}
-
 fn main() {
-    let stat = pezzo::unix::linux::proc::stat::Stat::current().unwrap();
-    let info = pezzo::unix::linux::tty::find_by_ttynr(stat.tty_nr).unwrap();
-    let mut ttyin = info.input().unwrap();
-    let mut ttyout = info.output().unwrap();
+    let mut ctx = Context::current().unwrap();
 
-    let password = prompt_password(b"Password: ", &mut ttyout, &mut ttyin).unwrap();
-    dbg!(unsafe { std::str::from_utf8_unchecked(&password[..]) });
+    unsafe {
+        ctx.authenticate(
+            CStr::from_bytes_with_nul_unchecked(b"sudo\0"),
+            None, // Some(CStr::from_bytes_with_nul_unchecked(b"shura\0")),
+        )
+    }
+    .unwrap();
 }
