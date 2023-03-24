@@ -394,3 +394,28 @@ impl Write for TtyOut {
         self
     }
 }
+
+impl Drop for TtyIn {
+    /// Consume input and zeroize the buffer
+    fn drop(&mut self) {
+        let _holder = super::common::nonblock(self);
+
+        let mut max_len = self.inner.buffer().len();
+        self.inner.consume(max_len);
+        while {
+            match self.inner.fill_buf() {
+                Err(err) if err.kind() == io::ErrorKind::Interrupted => true,
+                Err(_) => false,
+                Ok(_) => {
+                    let l = self.inner.buffer().len();
+                    self.inner.consume(l);
+                    max_len = max_len.max(l);
+                    true
+                }
+            }
+        } {}
+
+        unsafe { std::slice::from_raw_parts_mut(self.inner.buffer().as_ptr() as *mut u8, max_len) }
+            .fill(0);
+    }
+}
