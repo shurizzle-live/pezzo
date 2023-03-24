@@ -17,8 +17,26 @@ fn main() {
 
     let builder = bindgen::Builder::default()
         .header_contents("wrapper.h", "#include <security/pam_appl.h>")
-        .ctypes_prefix("libc")
-        .parse_callbacks(Box::new(UseCInt));
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks));
+
+    let builder = if cfg!(target_os = "linux") {
+        builder
+            .ctypes_prefix("libc")
+            .parse_callbacks(Box::new(UseCInt))
+    } else if cfg!(target_os = "macos") {
+        builder
+            .raw_line(
+                r#"pub mod c {
+        pub type c_char = ::libc::c_char;
+        pub type c_int = ::libc::c_int;
+        pub type c_uint = ::libc::c_int;
+        pub type c_void = ::libc::c_void;
+    }"#,
+            )
+            .ctypes_prefix("c")
+    } else {
+        builder
+    };
 
     let bindings = builder.generate().expect("Unable to generate bindings");
 

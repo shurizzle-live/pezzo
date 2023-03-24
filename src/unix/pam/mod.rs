@@ -254,7 +254,7 @@ pub struct PezzoConversation<'a> {
 }
 
 impl<'a> PezzoConversation<'a> {
-    pub fn new(ctx: &'a mut super::Context) -> Self {
+    pub fn new(ctx: &'a super::Context) -> Self {
         Self {
             timeout: ctx.prompt_timeout(),
             tty_in: ctx.tty_in(),

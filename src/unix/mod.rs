@@ -83,17 +83,17 @@ impl Context {
     }
 
     #[inline]
-    pub fn tty_in(&mut self) -> Arc<Mutex<TtyIn>> {
+    pub fn tty_in(&self) -> Arc<Mutex<TtyIn>> {
         self.tty_in.clone()
     }
 
     #[inline]
-    pub fn tty_out(&mut self) -> Arc<Mutex<TtyOut>> {
+    pub fn tty_out(&self) -> Arc<Mutex<TtyOut>> {
         self.tty_out.clone()
     }
 
     #[inline]
-    pub fn tty_inout(&mut self) -> (Arc<Mutex<TtyIn>>, Arc<Mutex<TtyOut>>) {
+    pub fn tty_inout(&self) -> (Arc<Mutex<TtyIn>>, Arc<Mutex<TtyOut>>) {
         (self.tty_in.clone(), self.tty_out.clone())
     }
 
@@ -103,12 +103,12 @@ impl Context {
     }
 
     #[inline]
-    pub fn authenticator(&mut self) -> pam::Result<pam::Authenticator<pam::PezzoConversation>> {
+    pub fn authenticator(&self) -> pam::Result<pam::Authenticator<pam::PezzoConversation>> {
         const SERVICE_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"pezzo\0") };
 
         pam::Authenticator::new(
             SERVICE_NAME,
-            Some(unsafe { CStr::from_ptr(self.original_user().name().as_ptr()) }),
+            Some(self.original_user().name()),
             pam::PezzoConversation::new(self),
         )
     }
