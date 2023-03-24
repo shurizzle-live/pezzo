@@ -219,34 +219,42 @@ impl TtyIn {
                     }
                 }
 
+                let mut first = true;
                 loop {
-                    let old_len = self.inner.buffer().len();
-
                     if let Err(err) = self.inner.fill_buf() {
                         match err {
                             err if err.kind() == io::ErrorKind::Interrupted => continue,
-                            err if err.kind() == io::ErrorKind::WouldBlock => break,
+                            err if err.kind() == io::ErrorKind::WouldBlock => {
+                                if first {
+                                    break;
+                                }
+                            }
                             err => return Err(err),
                         }
                     }
+                    first = !first;
 
-                    if self.inner.buffer().len() == old_len {
+                    if self.inner.buffer().is_empty() {
                         normalize_line(&mut buf);
                         return Ok(buf);
                     }
 
-                    if memchr::memchr(b'\0', self.inner.buffer()).is_some() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "line contains zeros",
-                        ));
-                    }
-
-                    if let Some(pos) = memchr::memchr(b'\n', self.inner.buffer()) {
-                        buf.push_slice(&self.inner.buffer()[..pos]);
-                        self.inner.consume(pos + 1);
-                        normalize_line(&mut buf);
-                        return Ok(buf);
+                    if let Some(pos) = memchr::memchr2(b'\n', b'\0', self.inner.buffer()) {
+                        match self.inner.buffer().get_unchecked(pos) {
+                            b'\n' => {
+                                buf.push_slice(self.inner.buffer().get_unchecked(..pos));
+                                self.inner.consume(pos + 1);
+                                normalize_line(&mut buf);
+                                return Ok(buf);
+                            }
+                            b'\0' => {
+                                return Err(io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "line contains zeros",
+                                ))
+                            }
+                            _ => unreachable!(),
+                        }
                     } else {
                         let inner = self.inner.buffer();
                         buf.push_slice(inner);
