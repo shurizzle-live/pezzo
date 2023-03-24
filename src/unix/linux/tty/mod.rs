@@ -1,6 +1,7 @@
 use std::{
     ffi::CStr,
-    io,
+    io::{self, Cursor, Write},
+    mem::MaybeUninit,
     os::{
         linux::fs::MetadataExt,
         unix::prelude::{FileTypeExt, OsStrExt},
@@ -18,20 +19,38 @@ const TTY_USB_MAJOR: u32 = 188;
 const NR_CONSOLES: u32 = 64;
 
 fn find_by_ttynr(ttynr: u32) -> io::Result<TtyInfo> {
-    let guessing = match (ttynr >> 8) & 0xff {
-        TTY_MAJOR => {
-            let min = minor(ttynr);
-            if min < NR_CONSOLES {
-                format!("tty{}", min)
-            } else {
-                format!("ttyS{}", min - NR_CONSOLES)
+    let mut guessing_buffer = MaybeUninit::<[u8; 14]>::uninit();
+
+    let guessing_len = {
+        let guessing = unsafe { guessing_buffer.assume_init_mut().as_mut_slice() };
+        let mut guessing_cursor = Cursor::new(guessing);
+
+        match (ttynr >> 8) & 0xff {
+            TTY_MAJOR => {
+                let min = minor(ttynr);
+                if min < NR_CONSOLES {
+                    let _ = write!(guessing_cursor, "tty{}", min);
+                } else {
+                    let _ = write!(guessing_cursor, "ttyS{}", min - NR_CONSOLES);
+                }
             }
+            PTS_MAJOR => {
+                let _ = write!(guessing_cursor, "pts/{}", minor(ttynr));
+            }
+            TTY_ACM_MAJOR => {
+                let _ = write!(guessing_cursor, "ttyACM{}", minor(ttynr));
+            }
+            TTY_USB_MAJOR => {
+                let _ = write!(guessing_cursor, "ttyUSB{}", minor(ttynr));
+            }
+            _ => return Err(io::Error::new(io::ErrorKind::NotFound, "not a valid tty")),
         }
-        PTS_MAJOR => format!("pts/{}", minor(ttynr)),
-        TTY_ACM_MAJOR => format!("ttyACM{}", minor(ttynr)),
-        TTY_USB_MAJOR => format!("ttyUSB{}", minor(ttynr)),
-        _ => return Err(io::Error::new(io::ErrorKind::NotFound, "not a valid tty")),
+
+        guessing_cursor.position() as usize
     };
+    let guessing_buffer = unsafe { guessing_buffer.assume_init() };
+    let guessing =
+        unsafe { std::str::from_utf8_unchecked(&guessing_buffer.as_slice()[..guessing_len]) };
 
     let ttynr = ttynr as u64;
 
@@ -115,7 +134,7 @@ fn find_by_ttynr(ttynr: u32) -> io::Result<TtyInfo> {
     }
 
     for path in ["/dev"] {
-        match scandir(path, &guessing, ttynr) {
+        match scandir(path, guessing, ttynr) {
             Ok(Some(info)) => return Ok(info),
             Err(err) => return Err(err),
             _ => (),
