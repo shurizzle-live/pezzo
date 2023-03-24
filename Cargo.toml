@@ -14,6 +14,9 @@ codegen-units = 1
 
 [features]
 
+[build-dependencies]
+bindgen = "0.64.0"
+
 [target.'cfg(unix)'.dependencies]
 atoi = "2.0.0"
 memchr = "2.5.0"

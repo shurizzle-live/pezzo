@@ -8,7 +8,7 @@ pub mod linux;
 pub mod macos;
 use std::{
     ffi::CStr,
-    io::{self, Write},
+    io,
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -102,21 +102,14 @@ impl Context {
         30
     }
 
-    pub fn print_prompt_password(&mut self) -> io::Result<()> {
-        let out = self.tty_out();
-        let mut out = out.lock().unwrap();
-        write!(
-            out,
-            "[pezzo] Password for {}: ",
-            self.original_user().name().to_string_lossy()
-        )?;
-        out.flush()
-    }
-
     #[inline]
-    pub fn authenticate(&mut self) -> Result<(), &'static CStr> {
-        const SERVICE_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"sudo\0") };
+    pub fn authenticator(&mut self) -> pam::Result<pam::Authenticator<pam::PezzoConversation>> {
+        const SERVICE_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"pezzo\0") };
 
-        pam::authenticate(SERVICE_NAME, self)
+        pam::Authenticator::new(
+            SERVICE_NAME,
+            Some(unsafe { CStr::from_ptr(self.original_user().name().as_ptr()) }),
+            pam::PezzoConversation::new(self),
+        )
     }
 }

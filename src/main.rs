@@ -5,5 +5,7 @@ extern crate pezzo;
 fn main() {
     let mut ctx = Context::current().unwrap();
 
-    ctx.authenticate().unwrap();
+    let mut auth = ctx.authenticator().unwrap();
+
+    auth.authenticate().unwrap();
 }
