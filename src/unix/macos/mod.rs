@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, non_camel_case_types, unused_assignments)]
 
 use std::{ffi::CStr, io, mem, os::raw::c_void, path::PathBuf, ptr, sync::Arc};
 

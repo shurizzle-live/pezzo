@@ -6,7 +6,12 @@ pub mod tty;
 pub mod linux;
 #[cfg(target_os = "macos")]
 pub mod macos;
-use std::{ffi::CStr, io, path::Path};
+use std::{
+    ffi::CStr,
+    io,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 mod process;
 
@@ -18,16 +23,16 @@ use self::tty::{TtyIn, TtyOut};
 pub struct Context {
     proc_ctx: ProcessContext,
     tty_ctx: TtyInfo,
-    tty_in: TtyIn,
-    tty_out: TtyOut,
+    tty_in: Arc<Mutex<TtyIn>>,
+    tty_out: Arc<Mutex<TtyOut>>,
 }
 
 impl Context {
     pub fn current() -> io::Result<Self> {
         let proc_ctx = ProcessContext::current()?;
         let tty_ctx = TtyInfo::for_ttyno(proc_ctx.ttyno)?;
-        let tty_in = tty_ctx.open_in()?;
-        let tty_out = tty_ctx.open_out()?;
+        let tty_in = Arc::new(Mutex::new(tty_ctx.open_in()?));
+        let tty_out = Arc::new(Mutex::new(tty_ctx.open_out()?));
 
         Ok(Self {
             proc_ctx,
@@ -78,18 +83,18 @@ impl Context {
     }
 
     #[inline]
-    pub fn tty_in(&mut self) -> &mut TtyIn {
-        &mut self.tty_in
+    pub fn tty_in(&mut self) -> Arc<Mutex<TtyIn>> {
+        self.tty_in.clone()
     }
 
     #[inline]
-    pub fn tty_out(&mut self) -> &mut TtyOut {
-        &mut self.tty_out
+    pub fn tty_out(&mut self) -> Arc<Mutex<TtyOut>> {
+        self.tty_out.clone()
     }
 
     #[inline]
-    pub fn tty_inout(&mut self) -> (&mut TtyIn, &mut TtyOut) {
-        (&mut self.tty_in, &mut self.tty_out)
+    pub fn tty_inout(&mut self) -> (Arc<Mutex<TtyIn>>, Arc<Mutex<TtyOut>>) {
+        (self.tty_in.clone(), self.tty_out.clone())
     }
 
     #[inline]

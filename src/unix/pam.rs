@@ -45,6 +45,42 @@ extern "C" {
     fn pam_strerror(pamh: *mut pam_handle_t, errnum: core::ffi::c_int) -> *const i8;
 }
 
+fn prompt(ctx: &mut Context, msg: &pam_message, echo: bool) -> pam_response {
+    fn _prompt(ctx: &mut Context, msg: &pam_message, echo: bool) -> Option<pam_response> {
+        if !msg.msg.is_null() {
+            let out = ctx.tty_out();
+            let mut out = out.lock().ok()?;
+            _ = out.write_all(unsafe { CStr::from_ptr(msg.msg as *const _).to_bytes() });
+            _ = out.flush();
+        }
+        let timeout = ctx.prompt_timeout();
+        let buf = {
+            let inp = ctx.tty_in();
+            let mut inp = inp.lock().ok()?;
+            if echo {
+                inp.c_readline(timeout)
+            } else {
+                inp.c_readline_noecho(timeout)
+            }
+            .ok()?
+        };
+
+        Some(pam_response {
+            resp: buf.leak_c_string(),
+            resp_retcode: 0,
+        })
+    }
+
+    if let Some(res) = _prompt(ctx, msg, echo) {
+        res
+    } else {
+        pam_response {
+            resp: ptr::null_mut(),
+            resp_retcode: 19,
+        }
+    }
+}
+
 unsafe extern "C" fn conversation(
     num_msg: core::ffi::c_int,
     msg: *const *const pam_message,
@@ -66,50 +102,30 @@ unsafe extern "C" fn conversation(
 
         match msg.msg_style {
             1 => {
-                if !msg.msg.is_null() {
-                    _ = ctx
-                        .tty_out()
-                        .write_all(CStr::from_ptr(msg.msg as *const _).to_bytes());
-                    _ = ctx.tty_out().flush();
-                }
-                let timeout = ctx.prompt_timeout();
-                match ctx.tty_in().c_readline_noecho(timeout) {
-                    Ok(buf) => {
-                        res.resp = buf.leak_c_string();
-                        res.resp_retcode = 0;
-                    }
-                    Err(_) => {
-                        res.resp = ptr::null_mut();
-                        res.resp_retcode = 19;
-                    }
-                }
+                *res = prompt(ctx, msg, false);
             }
             2 => {
-                if !msg.msg.is_null() {
-                    _ = ctx
-                        .tty_out()
-                        .write_all(CStr::from_ptr(msg.msg as *const _).to_bytes());
-                    _ = ctx.tty_out().flush();
-                }
-                let timeout = ctx.prompt_timeout();
-                match ctx.tty_in().c_readline(timeout) {
-                    Ok(buf) => {
-                        res.resp = buf.leak_c_string();
-                        res.resp_retcode = 0;
-                    }
-                    Err(_) => {
-                        res.resp = ptr::null_mut();
-                        res.resp_retcode = 19;
-                    }
-                }
+                *res = prompt(ctx, msg, true);
             }
             3 | 4 => {
-                if !msg.msg.is_null() {
-                    _ = ctx
-                        .tty_out()
-                        .write(CStr::from_ptr(msg.msg as *const _).to_bytes());
-                    _ = ctx.tty_out().flush();
+                *res = if !msg.msg.is_null() {
+                    if let Ok(mut out) = ctx.tty_out().lock() {
+                        _ = out.write(CStr::from_ptr(msg.msg as *const _).to_bytes());
+                        _ = out.flush();
+                        None
+                    } else {
+                        Some(pam_response {
+                            resp: ptr::null_mut(),
+                            resp_retcode: 19,
+                        })
+                    }
+                } else {
+                    None
                 }
+                .unwrap_or(pam_response {
+                    resp: ptr::null_mut(),
+                    resp_retcode: 0,
+                });
             }
             _ => {
                 res.resp = ptr::null_mut();
