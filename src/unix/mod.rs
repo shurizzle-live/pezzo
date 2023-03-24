@@ -53,13 +53,13 @@ impl Context {
     }
 
     #[inline]
-    pub fn original_uid(&self) -> u32 {
-        self.proc_ctx.original_uid
+    pub fn original_user(&self) -> &User {
+        &self.proc_ctx.original_user
     }
 
     #[inline]
-    pub fn original_gid(&self) -> u32 {
-        self.proc_ctx.original_gid
+    pub fn original_group(&self) -> &Group {
+        &self.proc_ctx.original_group
     }
 
     #[inline]
@@ -105,7 +105,11 @@ impl Context {
     pub fn print_prompt_password(&mut self) -> io::Result<()> {
         let out = self.tty_out();
         let mut out = out.lock().unwrap();
-        write!(out, "[pezzo] Password for ??: ")?;
+        write!(
+            out,
+            "[pezzo] Password for {}: ",
+            self.original_user().name().to_string_lossy()
+        )?;
         out.flush()
     }
 

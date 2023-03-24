@@ -2,6 +2,8 @@
 
 use std::{ffi::CStr, io, mem, os::raw::c_void, path::PathBuf, ptr, sync::Arc};
 
+use super::{Group, User};
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct _pcred {
@@ -133,7 +135,7 @@ impl super::process::ProcessContext {
         let pid = std::process::id();
         let sid = unsafe { libc::getsid(pid as i32) as u32 };
 
-        let (original_uid, original_gid, ttyno) = unsafe {
+        let (uid, gid, ttyno) = unsafe {
             let mut ki_proc: *mut kinfo_proc = ptr::null_mut();
             let mut size = mem::size_of::<kinfo_proc>();
             let mut mib = [
@@ -184,11 +186,49 @@ impl super::process::ProcessContext {
             (uid, gid, ttyno)
         };
 
+        let user_name = unsafe {
+            *libc::__error() = 0;
+            let pwd = libc::getpwuid(uid);
+            if pwd.is_null() {
+                if *libc::__error() == 0 {
+                    return Err(io::Error::new(io::ErrorKind::NotFound, "invalid user"));
+                } else {
+                    return Err(io::Error::last_os_error());
+                }
+            } else {
+                CStr::from_ptr((*pwd).pw_name).to_owned()
+            }
+        };
+
+        let group_name = unsafe {
+            *libc::__error() = 0;
+            let grd = libc::getgrgid(gid);
+            if grd.is_null() {
+                if *libc::__error() == 0 {
+                    return Err(io::Error::new(io::ErrorKind::NotFound, "invalid group"));
+                } else {
+                    return Err(io::Error::last_os_error());
+                }
+            } else {
+                CStr::from_ptr((*grd).gr_name).to_owned()
+            }
+        };
+
+        let original_user = User {
+            name: user_name,
+            id: uid,
+        };
+
+        let original_group = Group {
+            name: group_name,
+            id: gid,
+        };
+
         Ok(Self {
             exe,
             pid,
-            original_uid,
-            original_gid,
+            original_user,
+            original_group,
             sid,
             ttyno,
         })
