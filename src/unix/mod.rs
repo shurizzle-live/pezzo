@@ -114,9 +114,9 @@ impl Context {
     }
 
     #[inline]
-    pub fn authenticate(&mut self, user: Option<&CStr>) -> Result<(), &'static CStr> {
+    pub fn authenticate(&mut self) -> Result<(), &'static CStr> {
         const SERVICE_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"sudo\0") };
 
-        pam::authenticate(SERVICE_NAME, user, self)
+        pam::authenticate(SERVICE_NAME, self)
     }
 }

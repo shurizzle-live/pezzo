@@ -158,11 +158,7 @@ unsafe extern "C" fn conversation(
     0
 }
 
-pub fn authenticate(
-    service_name: &CStr,
-    user: Option<&CStr>,
-    ctx: &mut Context,
-) -> Result<(), &'static CStr> {
+pub fn authenticate(service_name: &CStr, ctx: &mut Context) -> Result<(), &'static CStr> {
     unsafe {
         let conv = pam_conv {
             conv: conversation,
@@ -173,7 +169,7 @@ pub fn authenticate(
             let mut pamh = ptr::null_mut();
             let rc = pam_start(
                 service_name.as_ptr(),
-                user.map(|u| u.as_ptr()).unwrap_or(ptr::null()),
+                ctx.original_user().name().as_ptr(),
                 &conv,
                 &mut pamh,
             );
