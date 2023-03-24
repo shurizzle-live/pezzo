@@ -8,7 +8,7 @@ pub mod linux;
 pub mod macos;
 use std::{
     ffi::CStr,
-    io,
+    io::{self, Write},
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -100,6 +100,13 @@ impl Context {
     #[inline]
     pub fn prompt_timeout(&self) -> libc::time_t {
         30
+    }
+
+    pub fn print_prompt_password(&mut self) -> io::Result<()> {
+        let out = self.tty_out();
+        let mut out = out.lock().unwrap();
+        write!(out, "[pezzo] Password for ??: ")?;
+        out.flush()
     }
 
     #[inline]

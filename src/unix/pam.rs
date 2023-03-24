@@ -46,13 +46,34 @@ extern "C" {
 }
 
 fn prompt(ctx: &mut Context, msg: &pam_message, echo: bool) -> pam_response {
+    fn prompt_is_password(msg: *const u8) -> bool {
+        if msg.is_null() {
+            return false;
+        }
+
+        let prompt = unsafe { CStr::from_ptr(msg as *const i8) };
+
+        if let Some(rest) = prompt.to_bytes().strip_prefix(b"Password:") {
+            rest.is_empty() || rest == b" "
+        } else {
+            false
+        }
+    }
+
     fn _prompt(ctx: &mut Context, msg: &pam_message, echo: bool) -> Option<pam_response> {
         if !msg.msg.is_null() {
-            let out = ctx.tty_out();
-            let mut out = out.lock().ok()?;
-            _ = out.write_all(unsafe { CStr::from_ptr(msg.msg as *const _).to_bytes() });
-            _ = out.flush();
+            if prompt_is_password(msg.msg) {
+                _ = ctx.print_prompt_password();
+            } else {
+                let out = ctx.tty_out();
+                let mut out = out.lock().ok()?;
+                _ = out.write_all(unsafe { CStr::from_ptr(msg.msg as *const _).to_bytes() });
+                _ = out.flush();
+            }
+        } else {
+            _ = ctx.print_prompt_password();
         }
+
         let timeout = ctx.prompt_timeout();
         let buf = {
             let inp = ctx.tty_in();
