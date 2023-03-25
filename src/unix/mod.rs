@@ -1,5 +1,6 @@
 mod common;
 mod pam;
+mod permissions;
 pub mod tty;
 #[cfg(target_os = "linux")]
 #[macro_use]
@@ -9,12 +10,14 @@ pub mod macos;
 use std::{
     ffi::CStr,
     io::{self, Write},
+    os::unix::prelude::PermissionsExt,
     path::Path,
     sync::{Arc, Mutex},
 };
 
 mod process;
 
+pub use permissions::*;
 pub use process::*;
 pub use tty::TtyInfo;
 
@@ -23,6 +26,7 @@ use self::tty::{TtyIn, TtyOut};
 pub struct Context {
     proc_ctx: ProcessContext,
     tty_ctx: TtyInfo,
+    perms: PermissionsContext,
     tty_in: Arc<Mutex<TtyIn>>,
     tty_out: Arc<Mutex<TtyOut>>,
 }
@@ -37,6 +41,7 @@ impl Context {
         Ok(Self {
             proc_ctx,
             tty_ctx,
+            perms: PermissionsContext::new()?,
             tty_in,
             tty_out,
         })
@@ -118,13 +123,13 @@ impl Context {
         )
     }
 
-    pub fn authenticate(&self) -> bool {
+    pub fn authenticate(&self) {
         let out = self.tty_out();
         let mut auth = self.authenticator().unwrap();
 
         for i in 1..=self.max_retries() {
             if matches!(auth.authenticate(), Ok(_)) {
-                return true;
+                return;
             }
 
             if auth.get_conv().is_timedout() {
@@ -141,6 +146,63 @@ impl Context {
                 _ = out.flush();
             }
         }
-        false
+        std::process::exit(1);
+    }
+
+    pub fn check_file_permissions<P: AsRef<Path>>(&self, path: P) {
+        let path = path.as_ref();
+        match path.metadata() {
+            Ok(md) => {
+                if (md.permissions().mode() & 0o022) != 0 {
+                    let out = self.tty_out();
+                    let mut out = out.lock().expect("tty is poisoned");
+                    _ = write!(
+                        out,
+                        "Wrong permissions on file '{}`. Your system has been compromised.",
+                        path.display()
+                    );
+                    _ = out.flush();
+                    std::process::exit(1);
+                }
+            }
+            Err(_) => {
+                let out = self.tty_out();
+                let mut out = out.lock().expect("tty is poisoned");
+                _ = write!(out, "Cannot find file '{}`", path.display());
+                _ = out.flush();
+                std::process::exit(1);
+            }
+        }
+    }
+
+    fn permissions_err(&self) -> ! {
+        let out = self.tty_out();
+        let mut out = out.lock().expect("tty is poisoned");
+        _ = write!(
+            out,
+            "pezzo: {} must be owned by uid 0 and have the setuid bit set",
+            self.exe().display()
+        );
+        _ = out.flush();
+        std::process::exit(1);
+    }
+
+    #[inline]
+    pub fn set_identity(&self, uid: u32, gid: u32) {
+        if self.perms.set_identity(uid, gid).is_err() {
+            self.permissions_err()
+        }
+    }
+
+    #[inline]
+    pub fn set_effective_identity(&self, uid: u32, gid: u32) {
+        if self.perms.set_effective_identity(uid, gid).is_err() {
+            self.permissions_err()
+        }
+    }
+
+    #[inline]
+    pub fn escalate_permissions(&self) {
+        self.set_effective_identity(0, 0)
     }
 }

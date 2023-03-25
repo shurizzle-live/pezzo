@@ -5,5 +5,8 @@ extern crate pezzo;
 fn main() {
     let ctx = Context::current().unwrap();
 
-    std::process::exit(if ctx.authenticate() { 0 } else { 1 });
+    ctx.escalate_permissions();
+    ctx.check_file_permissions(ctx.exe());
+
+    // ctx.authenticate();
 }

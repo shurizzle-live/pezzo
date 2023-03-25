@@ -30,6 +30,7 @@ pub enum Error {
     AccountExpired,
     NewAuthTokenRequired,
     PermissionDenied,
+    AuthorizationToken,
 }
 
 impl From<libc::c_int> for Error {
@@ -46,7 +47,8 @@ impl From<libc::c_int> for Error {
             sys::PAM_ACCT_EXPIRED => Self::AccountExpired,
             sys::PAM_NEW_AUTHTOK_REQD => Self::NewAuthTokenRequired,
             sys::PAM_PERM_DENIED => Self::PermissionDenied,
-            _ => unreachable!(),
+            sys::PAM_AUTHTOK_ERR => Self::AuthorizationToken,
+            x => unreachable!("unknown error {}", x),
         }
     }
 }
@@ -66,6 +68,7 @@ impl Into<libc::c_int> for Error {
             Self::AccountExpired => sys::PAM_ACCT_EXPIRED,
             Self::NewAuthTokenRequired => sys::PAM_NEW_AUTHTOK_REQD,
             Self::PermissionDenied => sys::PAM_PERM_DENIED,
+            Self::AuthorizationToken => sys::PAM_AUTHTOK_ERR,
         }
     }
 }
