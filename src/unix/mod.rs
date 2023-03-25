@@ -103,6 +103,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn max_retries(&self) -> usize {
+        3
+    }
+
+    #[inline]
     pub fn authenticator(&self) -> pam::Result<pam::Authenticator<pam::PezzoConversation>> {
         const SERVICE_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"pezzo\0") };
 

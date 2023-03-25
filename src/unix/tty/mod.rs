@@ -146,11 +146,17 @@ impl TtyIn {
 
     pub fn c_readline(&mut self, timeout: libc::time_t) -> io::Result<CBuffer> {
         fn normalize_line(buf: &mut CBuffer) {
-            if buf.as_slice().ends_with(b"\n") {
-                buf.len -= 1;
-            }
-            if buf.as_slice().ends_with(b"\r") {
-                buf.len -= 1;
+            if let Some(last2) = buf
+                .len()
+                .checked_sub(2)
+                .map(|p| unsafe { buf.get_unchecked(p..) })
+            {
+                if last2 == b"\r\n" {
+                    buf.truncate(buf.len() - 1);
+                    unsafe { *buf.get_unchecked_mut(buf.len() - 1) = b'\n' };
+                } else if last2 == b"\n\r" {
+                    buf.truncate(buf.len() - 1);
+                }
             }
 
             if let Some(i) = memchr::memrchr(b'\x15', buf.as_slice()) {

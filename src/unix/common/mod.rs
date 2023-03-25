@@ -1,4 +1,4 @@
-use std::{mem, ptr};
+use std::{mem, ptr, slice::SliceIndex};
 
 mod noecho;
 mod nonblock;
@@ -70,8 +70,51 @@ impl CBuffer {
     }
 
     #[inline]
+    pub fn get<I>(&self, index: I) -> Option<&I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.as_slice().get(index)
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked<I>(&self, index: I) -> &I::Output
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.as_slice().get_unchecked(index)
+    }
+
+    #[inline]
+    pub fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.as_mut_slice().get_mut(index)
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked_mut<I>(&mut self, index: I) -> &mut I::Output
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.as_mut_slice().get_unchecked_mut(index)
+    }
+
+    pub fn truncate(&mut self, pos: usize) {
+        if pos < self.len {
+            self.len = pos;
+        }
+    }
+
+    #[inline]
     pub fn as_slice(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.data, self.len) }
+    }
+
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        unsafe { std::slice::from_raw_parts_mut(self.data, self.len) }
     }
 
     #[inline]

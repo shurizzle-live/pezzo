@@ -4,7 +4,7 @@ mod sys;
 
 use std::{
     ffi::CStr,
-    io::Write,
+    io::{self, Write},
     marker::PhantomData,
     mem::{self, MaybeUninit},
     pin::Pin,
@@ -173,6 +173,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub type ConvResult<T> = std::result::Result<T, ConvError>;
 
 pub trait Conversation {
+    fn preflight(&mut self) {}
+
     fn prompt(&mut self, prompt: &CStr) -> ConvResult<CBuffer>;
 
     fn prompt_noecho(&mut self, prompt: &CStr) -> ConvResult<CBuffer>;
@@ -223,6 +225,8 @@ impl<'a, C: Conversation> Authenticator<'a, C> {
         const FLAGS: libc::c_int = sys::PAM_SILENT | sys::PAM_DISALLOW_NULL_AUTHTOK;
 
         unsafe {
+            self.get_conv_mut().get_unchecked_mut().preflight();
+
             self.last_status = sys::pam_authenticate(self.pamh, FLAGS);
             if self.last_status != sys::PAM_SUCCESS {
                 return Err(self.last_status.into());
@@ -234,6 +238,16 @@ impl<'a, C: Conversation> Authenticator<'a, C> {
             }
         }
         Ok(())
+    }
+
+    #[inline]
+    pub fn get_conv(&self) -> Pin<&C> {
+        self._conv.as_ref()
+    }
+
+    #[inline]
+    pub fn get_conv_mut(&mut self) -> Pin<&mut C> {
+        self._conv.as_mut()
     }
 }
 
@@ -248,6 +262,7 @@ impl<'a, C: Conversation> Drop for Authenticator<'a, C> {
 
 pub struct PezzoConversation<'a> {
     name: &'a CStr,
+    timedout: bool,
     timeout: libc::time_t,
     tty_in: Arc<Mutex<TtyIn>>,
     tty_out: Arc<Mutex<TtyOut>>,
@@ -257,6 +272,7 @@ impl<'a> PezzoConversation<'a> {
     pub fn new(ctx: &'a super::Context) -> Self {
         Self {
             timeout: ctx.prompt_timeout(),
+            timedout: false,
             tty_in: ctx.tty_in(),
             tty_out: ctx.tty_out(),
             name: ctx.original_user().name(),
@@ -283,12 +299,38 @@ impl<'a> PezzoConversation<'a> {
         let timeout = self.prompt_timeout();
         let buf = {
             let mut inp = self.tty_in.lock().expect("tty is poisoned");
-            if echo {
+            match if echo {
                 inp.c_readline(timeout)
             } else {
                 inp.c_readline_noecho(timeout)
-            }
-            .map_err(|_| ConvError::Conversation)?
+            } {
+                Err(err) => {
+                    {
+                        let mut out = self.tty_out.lock().expect("tty is poisoned");
+                        _ = out.write_all(b"\n");
+                        _ = out.flush();
+
+                        if err.kind() == io::ErrorKind::TimedOut {
+                            self.timedout = true;
+                            _ = out.write_all(b"pezzo: timed out reading password");
+                            _ = out.flush();
+                        }
+                    }
+                    Err(ConvError::Conversation)
+                }
+                Ok(mut buf) => {
+                    if buf.as_slice().last().map_or(true, |&c| c != b'\n') {
+                        if let Some(l) = buf.len().checked_sub(1) {
+                            buf.truncate(l)
+                        }
+                    } else {
+                        let mut out = self.tty_out.lock().expect("tty is poisoned");
+                        _ = out.write_all(b"\n");
+                        _ = out.flush();
+                    }
+                    Ok(buf)
+                }
+            }?
         };
 
         Ok(buf)
@@ -309,9 +351,18 @@ impl<'a> PezzoConversation<'a> {
     pub fn prompt_timeout(&self) -> libc::time_t {
         self.timeout
     }
+
+    #[inline]
+    pub fn is_timedout(&self) -> bool {
+        self.timedout
+    }
 }
 
 impl<'a> Conversation for PezzoConversation<'a> {
+    fn preflight(&mut self) {
+        self.timedout = false;
+    }
+
     #[inline]
     fn prompt(&mut self, prompt: &CStr) -> ConvResult<CBuffer> {
         self._prompt(prompt, true)
