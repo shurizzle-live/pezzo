@@ -187,7 +187,7 @@ pub trait Conversation {
 pub struct Authenticator<'a, C: Conversation> {
     last_status: libc::c_int,
     pamh: *mut sys::pam_handle_t,
-    _conv: Pin<Box<C>>,
+    conv: Pin<Box<C>>,
     _life: PhantomData<&'a ()>,
 }
 
@@ -214,7 +214,7 @@ impl<'a, C: Conversation> Authenticator<'a, C> {
                 Ok(Authenticator {
                     last_status: sys::PAM_SUCCESS,
                     pamh: pamh.assume_init(),
-                    _conv: conv,
+                    conv,
                     _life: PhantomData,
                 })
             }
@@ -242,12 +242,12 @@ impl<'a, C: Conversation> Authenticator<'a, C> {
 
     #[inline]
     pub fn get_conv(&self) -> Pin<&C> {
-        self._conv.as_ref()
+        self.conv.as_ref()
     }
 
     #[inline]
     pub fn get_conv_mut(&mut self) -> Pin<&mut C> {
-        self._conv.as_mut()
+        self.conv.as_mut()
     }
 }
 
@@ -312,14 +312,14 @@ impl<'a> PezzoConversation<'a> {
 
                         if err.kind() == io::ErrorKind::TimedOut {
                             self.timedout = true;
-                            _ = out.write_all(b"pezzo: timed out reading password");
+                            _ = out.write_all(b"pezzo: timed out reading password\n");
                             _ = out.flush();
                         }
                     }
                     Err(ConvError::Conversation)
                 }
                 Ok(mut buf) => {
-                    if buf.as_slice().last().map_or(true, |&c| c != b'\n') {
+                    if buf.as_slice().last().map_or(false, |&c| c == b'\n') {
                         if let Some(l) = buf.len().checked_sub(1) {
                             buf.truncate(l)
                         }

@@ -157,6 +157,10 @@ impl TtyIn {
                 } else if last2 == b"\n\r" {
                     buf.truncate(buf.len() - 1);
                 }
+            } else if let Some(c) = buf.as_mut_slice().last_mut() {
+                if *c == b'\r' {
+                    *c = b'\n'
+                }
             }
 
             if let Some(i) = memchr::memrchr(b'\x15', buf.as_slice()) {
@@ -248,7 +252,7 @@ impl TtyIn {
                     if let Some(pos) = memchr::memchr2(b'\n', b'\0', self.inner.buffer()) {
                         match self.inner.buffer().get_unchecked(pos) {
                             b'\n' => {
-                                buf.push_slice(self.inner.buffer().get_unchecked(..pos));
+                                buf.push_slice(self.inner.buffer().get_unchecked(..(pos + 1)));
                                 self.inner.consume(pos + 1);
                                 normalize_line(&mut buf);
                                 return Ok(buf);
