@@ -26,3 +26,7 @@ libc = "0.2.140"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ctor = "0.1.26"
+
+[dependencies]
+clap = { version = "4.1.13", features = ["derive"] }
+which = "4.4.0"
