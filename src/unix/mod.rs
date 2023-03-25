@@ -134,7 +134,7 @@ impl Context {
             {
                 let mut out = out.lock().expect("tty is poisoned");
                 if i == self.max_retries() {
-                    _ = writeln!(out, "pezzo: {} incorrect password attemps", i);
+                    _ = writeln!(out, "pezzo: {} incorrect password attempts", i);
                 } else {
                     _ = writeln!(out, "Sorry, try again.");
                 }
