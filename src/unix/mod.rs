@@ -8,7 +8,7 @@ pub mod linux;
 pub mod macos;
 use std::{
     ffi::CStr,
-    io,
+    io::{self, Write},
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -116,5 +116,31 @@ impl Context {
             Some(self.original_user().name()),
             pam::PezzoConversation::new(self),
         )
+    }
+
+    pub fn authenticate(&self) -> bool {
+        let out = self.tty_out();
+        let mut auth = self.authenticator().unwrap();
+
+        for i in 1..=self.max_retries() {
+            if matches!(auth.authenticate(), Ok(_)) {
+                return true;
+            }
+
+            if auth.get_conv().is_timedout() {
+                break;
+            }
+
+            {
+                let mut out = out.lock().expect("tty is poisoned");
+                if i == self.max_retries() {
+                    _ = writeln!(out, "pezzo: {} incorrect password attemps", i);
+                } else {
+                    _ = writeln!(out, "Sorry, try again.");
+                }
+                _ = out.flush();
+            }
+        }
+        false
     }
 }
