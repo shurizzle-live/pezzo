@@ -42,9 +42,24 @@ fn main() {
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings");
 
-    _ = fs::create_dir(&out_path);
+    if !out_path.exists() {
+        fs::create_dir(&out_path).unwrap();
+    }
 
     bindings
         .write_to_file(out_path.join("pam.rs"))
         .expect("Couldn't write bindings!");
+
+    if cfg!(target_os = "macos") {
+        let bindings = bindgen::Builder::default()
+            .header_contents("wrapper.h", "#include <sys/sysctl.h>")
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            .ctypes_prefix("libc")
+            .generate()
+            .expect("Unable to generate bindings");
+
+        bindings
+            .write_to_file(out_path.join("sysctl.rs"))
+            .expect("Couldn't write bindings!");
+    }
 }

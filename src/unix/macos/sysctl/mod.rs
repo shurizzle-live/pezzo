@@ -6,4 +6,4 @@
     dead_code
 )]
 
-include!(concat!(env!("OUT_DIR"), "/bindings/pam.rs"));
+include!(concat!(env!("OUT_DIR"), "/bindings/sysctl.rs"));
