@@ -280,11 +280,38 @@ impl<'a> PezzoConversation<'a> {
     }
 
     fn _prompt(&mut self, prompt: &CStr, echo: bool) -> ConvResult<CBuffer> {
-        fn prompt_is_password(prompt: &CStr) -> bool {
+        fn base_prompt_is_password(prompt: &CStr) -> bool {
             if let Some(rest) = prompt.to_bytes().strip_prefix(b"Password:") {
                 rest.is_empty() || rest == b" "
             } else {
                 false
+            }
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        #[inline(always)]
+        fn prompt_is_password(prompt: &CStr) -> bool {
+            base_prompt_is_password(prompt)
+        }
+
+        #[cfg(target_os = "linux")]
+        #[inline(always)]
+        fn prompt_is_password(prompt: &CStr) -> bool {
+            extern "C" {
+                fn dgettext(domainname: *const i8, msgid: *const i8) -> *const i8;
+            }
+            const DOMAIN: *const i8 = b"Linux-PAM\0".as_ptr() as *const i8;
+
+            unsafe {
+                libc::strcmp(
+                    prompt.as_ptr(),
+                    dgettext(DOMAIN, "Password:".as_ptr() as *const i8),
+                ) == 0
+                    || libc::strcmp(
+                        prompt.as_ptr(),
+                        dgettext(DOMAIN, "Password: ".as_ptr() as *const i8),
+                    ) == 0
+                    || base_prompt_is_password(prompt)
             }
         }
 
