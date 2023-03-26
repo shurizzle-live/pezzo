@@ -329,11 +329,12 @@ impl<'a> PezzoConversation<'a> {
         let timeout = self.prompt_timeout();
         let buf = {
             let mut inp = self.tty_in.lock().expect("tty is poisoned");
-            match if echo {
+            let line_res = if echo {
                 inp.c_readline(timeout)
             } else {
                 inp.c_readline_noecho(timeout)
-            } {
+            };
+            match line_res {
                 Err(err) => {
                     {
                         let mut out = self.tty_out.lock().expect("tty is poisoned");
