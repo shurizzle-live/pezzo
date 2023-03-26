@@ -16,7 +16,38 @@ pub struct Cli {
     pub command: Vec<OsString>,
 }
 
+// fn parse_conf() -> Vec<pezzo::conf::Rule> {
+fn parse_conf() -> pezzo::conf::Rule {
+    let content = pezzo::util::slurp("pezzo.conf").unwrap();
+    match pezzo::conf::parse(&content) {
+        Ok(c) => c,
+        Err(err) => {
+            let buf = &content[..err.location];
+            let mut line = 1;
+            let mut pos = 0;
+            for p in memchr::memchr_iter(b'\n', buf) {
+                line += 1;
+                pos = p;
+            }
+
+            let col = buf.len() - pos;
+            eprintln!(
+                "{}:{}: expected {}, got {}",
+                line,
+                col + 1,
+                err.expected,
+                content[err.location]
+            );
+
+            std::process::exit(0);
+        }
+    }
+}
+
 fn main() {
+    println!("{:#?}", parse_conf());
+    return;
+
     let Cli {
         user,
         group,
