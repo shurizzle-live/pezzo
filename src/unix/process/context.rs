@@ -1,41 +1,48 @@
-use std::{
-    ffi::{CStr, CString},
-    path::PathBuf,
-};
+use std::{ffi::CStr, path::PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct User {
-    pub(crate) name: CString,
+    pub(crate) name: Box<CStr>,
     pub(crate) id: u32,
 }
 
 #[derive(Debug, Clone)]
 pub struct Group {
-    pub(crate) name: CString,
+    pub(crate) name: Box<CStr>,
     pub(crate) id: u32,
 }
 
 impl User {
     #[inline]
     pub fn name(&self) -> &CStr {
-        self.name.as_c_str()
+        self.name.as_ref()
     }
 
     #[inline]
     pub fn id(&self) -> u32 {
         self.id
+    }
+
+    #[inline]
+    pub fn into_name(self) -> Box<CStr> {
+        self.name
     }
 }
 
 impl Group {
     #[inline]
     pub fn name(&self) -> &CStr {
-        self.name.as_c_str()
+        self.name.as_ref()
     }
 
     #[inline]
     pub fn id(&self) -> u32 {
         self.id
+    }
+
+    #[inline]
+    pub fn into_name(self) -> Box<CStr> {
+        self.name
     }
 }
 

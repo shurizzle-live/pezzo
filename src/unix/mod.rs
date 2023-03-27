@@ -1,4 +1,5 @@
 mod common;
+mod iam;
 mod pam;
 mod permissions;
 pub mod tty;
@@ -17,6 +18,7 @@ use std::{
 
 mod process;
 
+pub use iam::IAMContext;
 pub use permissions::*;
 pub use process::*;
 pub use tty::TtyInfo;
@@ -33,7 +35,8 @@ pub struct Context {
 
 impl Context {
     pub fn current() -> io::Result<Self> {
-        let proc_ctx = ProcessContext::current()?;
+        let iam = IAMContext::new()?;
+        let proc_ctx = ProcessContext::current(&iam)?;
         let tty_ctx = TtyInfo::for_ttyno(proc_ctx.ttyno)?;
         let tty_in = Arc::new(Mutex::new(tty_ctx.open_in()?));
         let tty_out = Arc::new(Mutex::new(tty_ctx.open_out()?));

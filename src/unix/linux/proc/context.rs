@@ -1,12 +1,13 @@
-use std::ffi::CStr;
 use std::io;
 
-use super::super::super::process::{Group, User};
+use super::super::super::{
+    process::{Group, User},
+    IAMContext, ProcessContext,
+};
 use super::stat::Stat;
-use crate::unix::ProcessContext;
 
 impl ProcessContext {
-    pub fn current() -> io::Result<Self> {
+    pub fn current(iam: &IAMContext) -> io::Result<Self> {
         let exe = std::env::current_exe()?;
         let proc_stat = Stat::current()?;
         let pid: u32 = proc_stat.pid;
@@ -15,32 +16,16 @@ impl ProcessContext {
         let uid: u32 = unsafe { libc::getuid() };
         let gid: u32 = unsafe { libc::getgid() };
 
-        let user_name = unsafe {
-            *libc::__errno_location() = 0;
-            let pwd = libc::getpwuid(uid);
-            if pwd.is_null() {
-                if *libc::__errno_location() == 0 {
-                    return Err(io::Error::new(io::ErrorKind::NotFound, "invalid user"));
-                } else {
-                    return Err(io::Error::last_os_error());
-                }
-            } else {
-                CStr::from_ptr((*pwd).pw_name).to_owned()
-            }
+        let user_name = if let Some(user_name) = iam.user_name_by_id(uid)? {
+            user_name
+        } else {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "invalid user"));
         };
 
-        let group_name = unsafe {
-            *libc::__errno_location() = 0;
-            let grd = libc::getgrgid(gid);
-            if grd.is_null() {
-                if *libc::__errno_location() == 0 {
-                    return Err(io::Error::new(io::ErrorKind::NotFound, "invalid group"));
-                } else {
-                    return Err(io::Error::last_os_error());
-                }
-            } else {
-                CStr::from_ptr((*grd).gr_name).to_owned()
-            }
+        let group_name = if let Some(group_name) = iam.group_name_by_id(uid)? {
+            group_name
+        } else {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "invalid group"));
         };
 
         let original_user = User {
