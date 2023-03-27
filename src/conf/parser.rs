@@ -1,4 +1,4 @@
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use std::ffi::CString;
 
 #[derive(Debug, Clone)]
@@ -163,9 +163,11 @@ peg::parser! {
 
         rule exe() -> Glob
             = name:(exe_char()+) {?
-                Glob::new(
+                GlobBuilder::new(
                         std::str::from_utf8(name.as_slice())
                             .map_err(|_| "invalid utf8")?)
+                    .literal_separator(true)
+                    .build()
                     .map_err(|_| "invalid glob")
             }
 
