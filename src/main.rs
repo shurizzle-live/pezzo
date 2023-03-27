@@ -16,8 +16,7 @@ pub struct Cli {
     pub command: Vec<OsString>,
 }
 
-// fn parse_conf() -> Vec<pezzo::conf::Rule> {
-fn parse_conf() -> pezzo::conf::Rule {
+fn parse_conf() -> Vec<pezzo::conf::Rule> {
     let content = pezzo::util::slurp("pezzo.conf").unwrap();
     match pezzo::conf::parse(&content) {
         Ok(c) => c,

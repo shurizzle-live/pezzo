@@ -1,3 +1,4 @@
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::ffi::CString;
 
 #[derive(Debug, Clone)]
@@ -24,14 +25,14 @@ pub enum Target {
 struct Builder {
     origin: Option<Vec<Origin>>,
     target: Option<Vec<Target>>,
-    exe: Option<Vec<Exe>>,
+    exe: Option<GlobSet>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Rule {
     pub origin: Option<Vec<Origin>>,
     pub target: Option<Vec<Target>>,
-    pub exe: Option<Vec<Exe>>,
+    pub exe: Option<GlobSet>,
 }
 
 impl From<Vec<Origin>> for Builder {
@@ -56,9 +57,9 @@ impl From<Vec<Target>> for Builder {
     }
 }
 
-impl From<Vec<Exe>> for Builder {
+impl From<GlobSet> for Builder {
     #[inline]
-    fn from(exe: Vec<Exe>) -> Self {
+    fn from(exe: GlobSet) -> Self {
         Self {
             origin: None,
             target: None,
@@ -118,11 +119,10 @@ peg::parser! {
         rule ignored() = quiet!{ws()/comment()}
         rule _ = quiet!{ignored()*}
 
-        // pub rule parse() -> Vec<Rule>
-        //     = rules:parse_rule()* { rules }
+        pub rule parse() -> Vec<Rule>
+            = rules:parse_rule()* { rules }
 
-        // rule parse_rule() -> Rule
-        pub rule parse() -> Rule
+        rule parse_rule() -> Rule
             = _ "rule" _ "{" _ r:rule_statements() _ "}" _ { r }
 
         rule _rule_statements() -> Vec<Builder>
@@ -157,32 +157,31 @@ peg::parser! {
         rule exe_statement() -> Builder
             = "exe" _ "=" _ e:exe_expr() _ ";" { e.into() }
 
-        rule exe_name_char() -> u8
-            = [b'\\'] c:[b'*' | b' ' | b'|'] { c }
-            / c:[^ b'/' | b'\0' | b' ' | b'|' | b';' | b':'] { c }
-
-        rule exe_name_glob_char() -> u8
-            = c:[^ b'/' | b'\0' | b' ' | b'|' | b';' | b':'] { c }
-
-        rule exe_path_char() -> u8
-            = [b'\\'] c:[b'*' | b' ' | b'|'] { c }
+        rule exe_char() -> u8
+            = [b'\\'] c:[b' ' | b'|' | b';' | b':'] { c }
             / c:[^ b'\0' | b' ' | b'|' | b';' | b':'] { c }
 
-        rule exe_path_glob_char() -> u8
-            = c:[^ b'\0' | b' ' | b'|' | b';' | b':'] { c }
+        rule exe() -> Glob
+            = name:(exe_char()+) {?
+                Glob::new(
+                        std::str::from_utf8(name.as_slice())
+                            .map_err(|_| "invalid utf8")?)
+                    .map_err(|_| "invalid glob")
+            }
 
-        rule exe() -> Exe
-            = name:(exe_name_char()+) { unsafe { Exe::Name(CString::from_vec_unchecked(name)) } }
-            / name:(exe_name_glob_char()+) { unsafe { Exe::GlobName(CString::from_vec_unchecked(name)) } }
-            / name:(exe_path_char()+) { unsafe { Exe::Path(CString::from_vec_unchecked(name)) } }
-            / name:(exe_path_glob_char()+) { unsafe { Exe::GlobPath(CString::from_vec_unchecked(name)) } }
-
-        rule exe_expr_cont() -> Exe
+        rule exe_expr_cont() -> Glob
             = [b'|'] _ e:exe() _ { e }
 
-        rule exe_expr() -> Vec<Exe>
-            = lh:exe() _ rh:exe_expr_cont()* { let mut rh = rh; rh.insert(0, lh); rh }
-            / name:exe() { vec![name] }
+        rule exe_expr() -> GlobSet
+            = lh:exe() _ rh:exe_expr_cont()* {?
+                let mut builder = GlobSetBuilder::new();
+                builder.add(lh);
+                for g in rh {
+                    builder.add(g);
+                }
+                builder.build().map_err(|_| "invalid exe glob")
+            }
+            / name:exe() {? GlobSetBuilder::new().add(name).build().map_err(|_| "invalid exe glob") }
 
         rule user() -> CString
             = name:$([b'A'..=b'Z'|b'a'..=b'z'|b'_'][b'A'..=b'Z'|b'a'..=b'z'|b'0'..=b'9'|b'_']+) { unsafe { CString::from_vec_unchecked(name.to_vec()) } }

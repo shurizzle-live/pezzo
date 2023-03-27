@@ -31,3 +31,4 @@ ctor = "0.2.0"
 peg = "0.8.1"
 clap = { version = "4.1.13", features = ["derive"] }
 which = "4.4.0"
+globset = { version = "0.4.10", features = ["simd-accel"] }
