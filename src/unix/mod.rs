@@ -25,6 +25,18 @@ pub use tty::TtyInfo;
 
 use self::tty::{TtyIn, TtyOut};
 
+#[cfg(target_os = "linux")]
+#[inline(always)]
+pub unsafe fn __errno() -> *mut libc::c_int {
+    libc::__errno_location()
+}
+
+#[cfg(target_os = "macos")]
+#[inline(always)]
+pub unsafe fn __errno() -> *mut libc::c_int {
+    libc::__error()
+}
+
 pub struct Context {
     proc_ctx: ProcessContext,
     tty_ctx: TtyInfo,

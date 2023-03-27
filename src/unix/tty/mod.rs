@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use super::common::CBuffer;
+use super::{__errno, common::CBuffer};
 
 pub struct TtyInfo {
     pub(crate) path: Arc<PathBuf>,
@@ -204,25 +204,11 @@ impl TtyIn {
                             ptr::null_mut(),
                             &mut timeout_val,
                         );
-                        #[cfg(target_os = "linux")]
-                        {
-                            err == -1 && *libc::__errno_location() == libc::EINTR
-                        }
-                        #[cfg(target_os = "macos")]
-                        {
-                            err == -1 && *libc::__error() == libc::EINTR
-                        }
+                        err == -1 && *__errno() == libc::EINTR
                     } {}
 
                     if err == 0 {
-                        #[cfg(target_os = "linux")]
-                        {
-                            *libc::__errno_location() = libc::ETIMEDOUT;
-                        }
-                        #[cfg(target_os = "macos")]
-                        {
-                            *libc::__error() = libc::ETIMEDOUT;
-                        }
+                        *__errno() = libc::ETIMEDOUT;
                         return Err(io::Error::last_os_error());
                     } else if err == -1 {
                         return Err(io::Error::last_os_error());

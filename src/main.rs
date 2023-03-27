@@ -145,6 +145,7 @@ fn _main() -> Result<()> {
 fn main() {
     if let Err(err) = _main() {
         eprintln!("{}", err);
+        eprintln!("{:?}", err);
         std::process::exit(1);
     }
 }

@@ -1,6 +1,6 @@
 use std::{ffi::CStr, io};
 
-use super::{Group, User};
+use super::{Group, User, __errno};
 
 #[derive(Debug)]
 pub struct IAMContext;
@@ -27,15 +27,14 @@ impl IAMContext {
         })
     }
 
-    #[cfg(target_os = "linux")]
     pub fn user_id_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<u32>> {
         let name = name.as_ref();
 
         unsafe {
-            *libc::__errno_location() = 0;
+            *__errno() = 0;
             let pwd = libc::getpwnam(name.as_ptr());
             if pwd.is_null() {
-                if *libc::__errno_location() == 0 {
+                if *__errno() == 0 {
                     Ok(None)
                 } else {
                     Err(io::Error::last_os_error())
@@ -46,13 +45,12 @@ impl IAMContext {
         }
     }
 
-    #[cfg(target_os = "linux")]
     pub fn user_name_by_id(&self, uid: u32) -> io::Result<Option<Box<CStr>>> {
         unsafe {
-            *libc::__errno_location() = 0;
+            *__errno() = 0;
             let pwd = libc::getpwuid(uid);
             if pwd.is_null() {
-                if *libc::__errno_location() == 0 {
+                if *__errno() == 0 {
                     Ok(None)
                 } else {
                     Err(io::Error::last_os_error())
@@ -65,33 +63,13 @@ impl IAMContext {
         }
     }
 
-    #[cfg(target_os = "macos")]
-    pub fn user_name_by_id(&self, uid: u32) -> io::Result<Option<Box<CStr>>> {
-        unsafe {
-            *libc::__error() = 0;
-            let pwd = libc::getpwuid(uid);
-            if pwd.is_null() {
-                if *libc::__error() == 0 {
-                    Ok(None)
-                } else {
-                    Err(io::Error::last_os_error())
-                }
-            } else {
-                Ok(Some(
-                    CStr::from_ptr((*pwd).pw_name).to_owned().into_boxed_c_str(),
-                ))
-            }
-        }
-    }
-
-    #[cfg(target_os = "linux")]
     pub fn group_id_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<u32>> {
         let name = name.as_ref();
         unsafe {
-            *libc::__errno_location() = 0;
+            *__errno() = 0;
             let grd = libc::getgrnam(name.as_ptr());
             if grd.is_null() {
-                if *libc::__errno_location() == 0 {
+                if *__errno() == 0 {
                     Ok(None)
                 } else {
                     Err(io::Error::last_os_error())
@@ -102,13 +80,12 @@ impl IAMContext {
         }
     }
 
-    #[cfg(target_os = "linux")]
     pub fn group_name_by_id(&self, gid: u32) -> io::Result<Option<Box<CStr>>> {
         unsafe {
-            *libc::__errno_location() = 0;
+            *__errno() = 0;
             let grd = libc::getgrgid(gid);
             if grd.is_null() {
-                if *libc::__errno_location() == 0 {
+                if *__errno() == 0 {
                     Ok(None)
                 } else {
                     Err(io::Error::last_os_error())
@@ -116,25 +93,6 @@ impl IAMContext {
             } else {
                 Ok(Some(
                     CStr::from_ptr((*grd).gr_name).to_owned().into_boxed_c_str(),
-                ))
-            }
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    pub fn group_name_by_id(&self, uid: u32) -> io::Result<Option<Box<CStr>>> {
-        unsafe {
-            *libc::__error() = 0;
-            let pwd = libc::getgrgid(uid);
-            if pwd.is_null() {
-                if *libc::__error() == 0 {
-                    Ok(None)
-                } else {
-                    Err(io::Error::last_os_error())
-                }
-            } else {
-                Ok(Some(
-                    CStr::from_ptr((*pwd).pw_name).to_owned().into_boxed_c_str(),
                 ))
             }
         }

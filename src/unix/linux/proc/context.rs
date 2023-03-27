@@ -22,7 +22,7 @@ impl ProcessContext {
             return Err(io::Error::new(io::ErrorKind::NotFound, "invalid user"));
         };
 
-        let group_name = if let Some(group_name) = iam.group_name_by_id(uid)? {
+        let group_name = if let Some(group_name) = iam.group_name_by_id(gid)? {
             group_name
         } else {
             return Err(io::Error::new(io::ErrorKind::NotFound, "invalid group"));
