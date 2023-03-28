@@ -30,7 +30,7 @@ struct Builder {
 
 #[derive(Debug, Clone)]
 pub struct Rule {
-    pub origin: Option<Vec<Origin>>,
+    pub origin: Vec<Origin>,
     pub target: Option<Vec<Target>>,
     pub exe: Option<GlobSet>,
 }
@@ -99,11 +99,15 @@ impl Builder {
     }
 
     #[inline]
-    pub fn build(self) -> Rule {
-        Rule {
-            origin: self.origin,
-            target: self.target,
-            exe: self.exe,
+    pub fn build(self) -> Result<Rule, &'static str> {
+        if let Some(origin) = self.origin {
+            Ok(Rule {
+                origin,
+                target: self.target,
+                exe: self.exe,
+            })
+        } else {
+            Err("origin not defined in rule")
         }
     }
 }
@@ -140,7 +144,7 @@ peg::parser! {
                 for rule in rules {
                     acc.merge(rule)?;
                 }
-                Ok(acc.build())
+                acc.build()
             }
 
         rule rule_statement() -> Builder
