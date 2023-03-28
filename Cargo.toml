@@ -18,13 +18,11 @@ codegen-units = 1
 bindgen = "0.64.0"
 
 [target.'cfg(unix)'.dependencies]
-atoi = "2.0.0"
 memchr = "2.5.0"
-zeroize = { version = "1.5.7", features = ["zeroize_derive"] }
-crypt = { path = "crypt" }
 libc = "0.2.140"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+atoi = "2.0.0"
 ctor = "0.2.0"
 
 [dependencies]
