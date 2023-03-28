@@ -2,14 +2,6 @@ use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use std::ffi::CString;
 
 #[derive(Debug, Clone)]
-pub enum Exe {
-    Name(CString),
-    GlobName(CString),
-    Path(CString),
-    GlobPath(CString),
-}
-
-#[derive(Debug, Clone)]
 pub enum Origin {
     User(Vec<CString>),
     Group(Vec<CString>),
