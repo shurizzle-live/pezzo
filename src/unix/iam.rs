@@ -135,4 +135,9 @@ impl IAMContext {
         }
         Ok(())
     }
+
+    #[inline]
+    pub fn escalate_permissions(&self) -> io::Result<()> {
+        self.set_effective_identity(0, 0)
+    }
 }

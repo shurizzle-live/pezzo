@@ -2,7 +2,7 @@ use std::{
     ffi::{CStr, CString, OsString},
     io,
     os::unix::process::CommandExt,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -75,6 +75,8 @@ pub struct MatchContext {
 
 impl MatchContext {
     pub fn new(
+        iam: IAMContext,
+        proc: ProcessContext,
         user: Option<Box<CStr>>,
         group: Option<Box<CStr>>,
         mut arguments: Vec<OsString>,
@@ -85,9 +87,6 @@ impl MatchContext {
         } else {
             bail!("Command {:?} not found.", command);
         };
-
-        let iam = IAMContext::new().context("Cannot initialize users and groups.")?;
-        let proc = ProcessContext::current(&iam).context("Cannot get process informations")?;
 
         let target_user = user.map_or_else(
             || iam.default_user().context("Cannot get root informations."),
@@ -119,10 +118,34 @@ impl MatchContext {
     }
 }
 
+fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
+    use std::os::unix::prelude::PermissionsExt;
+
+    let path = path.as_ref();
+    match path.metadata() {
+        Ok(md) => {
+            if (md.permissions().mode() & 0o022) != 0 {
+                bail!(
+                    "Wrong permissions on file '{}`. Your system has been compromised.",
+                    path.display()
+                );
+            }
+        }
+        Err(_) => {
+            bail!("Cannot find file '{}`", path.display());
+        }
+    }
+
+    Ok(())
+}
+
 fn _main() -> Result<()> {
-    // TODO: migrate this methods to iam/proc and call them
-    // ctx.escalate_permissions();
-    // ctx.check_file_permissions(ctx.exe());
+    let iam = IAMContext::new().context("Cannot initialize users and groups.")?;
+    let proc = ProcessContext::current(&iam).context("Cannot get process informations")?;
+
+    iam.escalate_permissions()
+        .context("Cannot set root permissions.")?;
+    check_file_permissions(&proc.exe)?;
 
     let Cli {
         user,
@@ -130,7 +153,7 @@ fn _main() -> Result<()> {
         command: args,
     } = Cli::parse();
 
-    let ctx = MatchContext::new(user, group, args)?;
+    let ctx = MatchContext::new(iam, proc, user, group, args)?;
 
     println!("{ctx:#?}");
 
@@ -145,7 +168,6 @@ fn _main() -> Result<()> {
 fn main() {
     if let Err(err) = _main() {
         eprintln!("{}", err);
-        eprintln!("{:?}", err);
         std::process::exit(1);
     }
 }
