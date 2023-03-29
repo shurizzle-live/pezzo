@@ -112,6 +112,101 @@ impl IAMContext {
         })
     }
 
+    pub fn get_groups<B: AsRef<[u8]>>(&self, user_name: B) -> io::Result<Vec<Group>> {
+        let name = user_name.as_ref();
+
+        unsafe {
+            let mut buf = Vec::new();
+
+            libc::setgrent();
+
+            *crate::unix::__errno() = 0;
+
+            loop {
+                let group = libc::getgrent();
+                if group.is_null() {
+                    break;
+                }
+
+                let is_member = 'member: {
+                    let mut it = (*group).gr_mem;
+
+                    while !(*it).is_null() {
+                        if CStr::from_ptr(*it).to_bytes() == name {
+                            break 'member true;
+                        }
+
+                        it = it.add(1);
+                    }
+                    false
+                };
+
+                if is_member {
+                    let name = CStr::from_ptr((*group).gr_name)
+                        .to_owned()
+                        .into_boxed_c_str();
+                    let id = (*group).gr_gid;
+
+                    buf.push(Group { name, id })
+                }
+            }
+
+            let errno = *crate::unix::__errno();
+            libc::endgrent();
+
+            if errno != 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(buf)
+            }
+        }
+    }
+
+    pub fn get_group_ids<B: AsRef<[u8]>>(&self, user_name: B) -> io::Result<Vec<u32>> {
+        let name = user_name.as_ref();
+
+        unsafe {
+            let mut buf = Vec::new();
+
+            libc::setgrent();
+
+            *crate::unix::__errno() = 0;
+
+            loop {
+                let group = libc::getgrent();
+                if group.is_null() {
+                    break;
+                }
+
+                let is_member = 'member: {
+                    let mut it = (*group).gr_mem;
+
+                    while !(*it).is_null() {
+                        if CStr::from_ptr(*it).to_bytes() == name {
+                            break 'member true;
+                        }
+
+                        it = it.add(1);
+                    }
+                    false
+                };
+
+                if is_member {
+                    buf.push((*group).gr_gid);
+                }
+            }
+
+            let errno = *crate::unix::__errno();
+            libc::endgrent();
+
+            if errno != 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(buf)
+            }
+        }
+    }
+
     pub fn set_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
         unsafe {
             if libc::setuid(uid) == -1 {

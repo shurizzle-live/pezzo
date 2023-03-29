@@ -24,39 +24,6 @@ pub fn get_groups() -> io::Result<Vec<u32>> {
     }
 }
 
-pub fn getugroups() -> io::Result<Vec<Group>> {
-    unsafe {
-        let mut buf = Vec::new();
-
-        libc::setgrent();
-
-        *crate::unix::__errno() = 0;
-
-        loop {
-            let group = libc::getgrent();
-            if group.is_null() {
-                break;
-            }
-
-            let name = CStr::from_ptr((*group).gr_name)
-                .to_owned()
-                .into_boxed_c_str();
-            let id = (*group).gr_gid;
-
-            buf.push(Group { name, id })
-        }
-
-        let errno = *crate::unix::__errno();
-        libc::endgrent();
-
-        if errno != 0 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(buf)
-        }
-    }
-}
-
 impl ProcessContext {
     pub fn current(iam: &IAMContext) -> io::Result<Self> {
         let uid: u32 = unsafe { libc::getuid() };
@@ -92,7 +59,7 @@ impl ProcessContext {
             id: gid,
         };
 
-        let original_groups = getugroups()?;
+        let original_groups = iam.get_groups(original_user.name().to_bytes())?;
 
         Ok(Self {
             exe,

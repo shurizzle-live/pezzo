@@ -40,7 +40,11 @@ fn parse_box_c_str(input: &str) -> Result<Box<CStr>, &'static str> {
 }
 
 fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
-    use std::os::{linux::fs::MetadataExt, unix::prelude::PermissionsExt};
+    #[cfg(target_os = "linux")]
+    use std::os::linux::fs::MetadataExt;
+    #[cfg(target_os = "macos")]
+    use std::os::macos::fs::MetadataExt;
+    use std::os::unix::prelude::PermissionsExt;
 
     let path = path.as_ref();
     match path.metadata() {

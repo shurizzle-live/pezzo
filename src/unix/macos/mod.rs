@@ -87,11 +87,14 @@ impl super::process::ProcessContext {
             id: gid,
         };
 
+        let original_groups = iam.get_groups(original_user.name().to_bytes())?;
+
         Ok(Self {
             exe,
             pid,
             original_user,
             original_group,
+            original_groups,
             sid,
             ttyno,
         })
