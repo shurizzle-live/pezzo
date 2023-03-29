@@ -1,7 +1,5 @@
 use std::{
     ffi::{CStr, CString, OsString},
-    io,
-    os::unix::process::CommandExt,
     path::{Path, PathBuf},
 };
 
@@ -113,7 +111,7 @@ impl MatchContext {
     ) -> Result<Self> {
         let command = arguments.remove(0);
         let command = if let Ok(command) = which::which(&command) {
-            command
+            command.read_link()?
         } else {
             bail!("Command {:?} not found.", command);
         };
@@ -240,7 +238,7 @@ fn _main() -> Result<()> {
         .escalate_permissions()
         .context("Cannot set root permissions.")?;
 
-    let (ctx, command, arguments) = {
+    let (ctx, _command, _arguments) = {
         (
             pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group)
                 .context("Cannot instantiate tty")?,

@@ -10,7 +10,6 @@ pub mod macos;
 use std::{
     ffi::CStr,
     io::{self, Write},
-    os::unix::prelude::PermissionsExt,
     path::Path,
     sync::{Arc, Mutex},
 };
