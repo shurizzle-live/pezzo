@@ -52,6 +52,7 @@ pub struct ProcessContext {
     pub pid: u32,
     pub original_user: User,
     pub original_group: Group,
+    pub original_groups: Vec<Group>,
     pub sid: u32,
     pub ttyno: u32,
 }

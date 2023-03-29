@@ -1,7 +1,6 @@
 mod common;
 mod iam;
 mod pam;
-mod permissions;
 pub mod tty;
 #[cfg(target_os = "linux")]
 #[macro_use]
@@ -19,7 +18,6 @@ use std::{
 mod process;
 
 pub use iam::IAMContext;
-pub use permissions::*;
 pub use process::*;
 pub use tty::TtyInfo;
 
@@ -40,27 +38,34 @@ pub unsafe fn __errno() -> *mut libc::c_int {
 }
 
 pub struct Context {
+    iam: IAMContext,
     proc_ctx: ProcessContext,
     tty_ctx: TtyInfo,
-    perms: PermissionsContext,
     tty_in: Arc<Mutex<TtyIn>>,
     tty_out: Arc<Mutex<TtyOut>>,
+    target_user: User,
+    target_group: Option<Group>,
 }
 
 impl Context {
-    pub fn current() -> io::Result<Self> {
-        let iam = IAMContext::new()?;
-        let proc_ctx = ProcessContext::current(&iam)?;
+    pub fn new(
+        iam: IAMContext,
+        proc_ctx: ProcessContext,
+        target_user: User,
+        target_group: Option<Group>,
+    ) -> io::Result<Self> {
         let tty_ctx = TtyInfo::for_ttyno(proc_ctx.ttyno)?;
         let tty_in = Arc::new(Mutex::new(tty_ctx.open_in()?));
         let tty_out = Arc::new(Mutex::new(tty_ctx.open_out()?));
 
         Ok(Self {
+            iam,
             proc_ctx,
             tty_ctx,
-            perms: PermissionsContext::new()?,
             tty_in,
             tty_out,
+            target_user,
+            target_group,
         })
     }
 
@@ -82,6 +87,16 @@ impl Context {
     #[inline]
     pub fn original_group(&self) -> &Group {
         &self.proc_ctx.original_group
+    }
+
+    #[inline]
+    pub fn target_user(&self) -> &User {
+        &self.target_user
+    }
+
+    #[inline]
+    pub fn target_group(&self) -> Option<&Group> {
+        self.target_group.as_ref()
     }
 
     #[inline]
@@ -142,6 +157,16 @@ impl Context {
 
     pub fn authenticate(&self) {
         let out = self.tty_out();
+
+        {
+            let uid = self.target_user.id();
+            let gid = self
+                .target_group()
+                .map(|g| g.id)
+                .unwrap_or_else(|| self.original_group().id);
+            self.iam.set_effective_identity(uid, gid).unwrap();
+        }
+
         let mut auth = self.authenticator().unwrap();
 
         for i in 1..=self.max_retries() {
@@ -164,62 +189,5 @@ impl Context {
             }
         }
         std::process::exit(1);
-    }
-
-    pub fn check_file_permissions<P: AsRef<Path>>(&self, path: P) {
-        let path = path.as_ref();
-        match path.metadata() {
-            Ok(md) => {
-                if (md.permissions().mode() & 0o022) != 0 {
-                    let out = self.tty_out();
-                    let mut out = out.lock().expect("tty is poisoned");
-                    _ = write!(
-                        out,
-                        "Wrong permissions on file '{}`. Your system has been compromised.",
-                        path.display()
-                    );
-                    _ = out.flush();
-                    std::process::exit(1);
-                }
-            }
-            Err(_) => {
-                let out = self.tty_out();
-                let mut out = out.lock().expect("tty is poisoned");
-                _ = write!(out, "Cannot find file '{}`", path.display());
-                _ = out.flush();
-                std::process::exit(1);
-            }
-        }
-    }
-
-    fn permissions_err(&self) -> ! {
-        let out = self.tty_out();
-        let mut out = out.lock().expect("tty is poisoned");
-        _ = write!(
-            out,
-            "pezzo: {} must be owned by uid 0 and have the setuid bit set",
-            self.exe().display()
-        );
-        _ = out.flush();
-        std::process::exit(1);
-    }
-
-    #[inline]
-    pub fn set_identity(&self, uid: u32, gid: u32) {
-        if self.perms.set_identity(uid, gid).is_err() {
-            self.permissions_err()
-        }
-    }
-
-    #[inline]
-    pub fn set_effective_identity(&self, uid: u32, gid: u32) {
-        if self.perms.set_effective_identity(uid, gid).is_err() {
-            self.permissions_err()
-        }
-    }
-
-    #[inline]
-    pub fn escalate_permissions(&self) {
-        self.set_effective_identity(0, 0)
     }
 }

@@ -7,7 +7,10 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
-use pezzo::unix::{Group, IAMContext, ProcessContext, User};
+use pezzo::{
+    conf::{Origin, Target},
+    unix::{Group, IAMContext, ProcessContext, User},
+};
 
 extern crate pezzo;
 
@@ -36,10 +39,35 @@ fn parse_box_c_str(input: &str) -> Result<Box<CStr>, &'static str> {
     }
 }
 
-fn parse_conf() -> Vec<pezzo::conf::Rule> {
-    let content = pezzo::util::slurp("pezzo.conf").unwrap();
+fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
+    use std::os::{linux::fs::MetadataExt, unix::prelude::PermissionsExt};
+
+    let path = path.as_ref();
+    match path.metadata() {
+        Ok(md) => {
+            if md.st_uid() != 0 || (md.permissions().mode() & 0o022) != 0 {
+                bail!(
+                    "Wrong permissions on file '{}`. Your system has been compromised.",
+                    path.display()
+                );
+            }
+        }
+        Err(_) => {
+            bail!("Cannot find file '{}`", path.display());
+        }
+    }
+
+    Ok(())
+}
+
+fn parse_conf<P: AsRef<Path>>(path: P) -> Result<pezzo::conf::Rules> {
+    let path = path.as_ref();
+
+    check_file_permissions(path)?;
+
+    let content = pezzo::util::slurp(path).context("Cannot read configuration file.")?;
     match pezzo::conf::parse(&content) {
-        Ok(c) => c,
+        Ok(c) => Ok(c),
         Err(err) => {
             let buf = &content[..err.location];
             let mut line = 1;
@@ -50,15 +78,13 @@ fn parse_conf() -> Vec<pezzo::conf::Rule> {
             }
 
             let col = buf.len() - pos;
-            eprintln!(
+            bail!(
                 "{}:{}: expected {}, got {}",
                 line,
                 col + 1,
                 err.expected,
                 content[err.location]
             );
-
-            std::process::exit(1);
         }
     }
 }
@@ -116,35 +142,80 @@ impl MatchContext {
             proc,
         })
     }
-}
 
-fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
-    use std::os::unix::prelude::PermissionsExt;
+    pub fn matches(&self, conf: &pezzo::conf::Rules) -> bool {
+        conf.rules()
+            .iter()
+            .filter(|&rule| {
+                {
+                    let groups_match = rule.origin.iter().any(|x| match x {
+                        Origin::User(users) => users
+                            .iter()
+                            .any(|u| self.proc.original_user.name() == u.as_c_str()),
+                        Origin::Group(groups) => groups.iter().any(|g| {
+                            let g = g.as_c_str();
+                            self.proc.original_group.name() == g
+                                || self.proc.original_groups.iter().any(|og| og.name() == g)
+                        }),
+                        Origin::UserGroup(users, groups) => {
+                            users
+                                .iter()
+                                .any(|u| self.proc.original_user.name() == u.as_c_str())
+                                && groups.iter().any(|g| {
+                                    let g = g.as_c_str();
+                                    self.proc.original_group.name() == g
+                                        || self.proc.original_groups.iter().any(|og| og.name() == g)
+                                })
+                        }
+                    });
 
-    let path = path.as_ref();
-    match path.metadata() {
-        Ok(md) => {
-            if (md.permissions().mode() & 0o022) != 0 {
-                bail!(
-                    "Wrong permissions on file '{}`. Your system has been compromised.",
-                    path.display()
-                );
-            }
-        }
-        Err(_) => {
-            bail!("Cannot find file '{}`", path.display());
-        }
+                    if !groups_match {
+                        return false;
+                    }
+                }
+
+                {
+                    let target_match = if let Some(ref target) = rule.target {
+                        target.iter().any(|x| match x {
+                            Target::User(users) => users
+                                .iter()
+                                .any(|u| self.target_user.name() == u.as_c_str()),
+                            Target::UserGroup(users, groups) => {
+                                users
+                                    .iter()
+                                    .any(|u| self.target_user.name() == u.as_c_str())
+                                    && self.target_group.as_ref().map_or(true, |target_group| {
+                                        let target_group = target_group.name();
+                                        groups.iter().any(|u| target_group == u.as_c_str())
+                                    })
+                            }
+                        })
+                    } else {
+                        true
+                    };
+
+                    if !target_match {
+                        return false;
+                    }
+                }
+
+                rule.exe
+                    .as_ref()
+                    .map_or(true, |exe| exe.is_match(&self.command))
+            })
+            .last()
+            .is_some()
     }
-
-    Ok(())
 }
 
 fn _main() -> Result<()> {
     let iam = IAMContext::new().context("Cannot initialize users and groups.")?;
-    let proc = ProcessContext::current(&iam).context("Cannot get process informations")?;
 
     iam.escalate_permissions()
         .context("Cannot set root permissions.")?;
+
+    let proc = ProcessContext::current(&iam).context("Cannot get process informations")?;
+
     check_file_permissions(&proc.exe)?;
 
     let Cli {
@@ -155,11 +226,26 @@ fn _main() -> Result<()> {
 
     let ctx = MatchContext::new(iam, proc, user, group, args)?;
 
-    println!("{ctx:#?}");
+    let rules = parse_conf("pezzo.conf")?;
 
-    // TODO: match through rules
+    if !ctx.matches(&rules) {
+        bail!("Cannot match any rule.");
+    }
 
-    // ctx.authenticate();
+    ctx.iam
+        .escalate_permissions()
+        .context("Cannot set root permissions.")?;
+
+    let (ctx, command, arguments) = {
+        (
+            pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group)
+                .context("Cannot instantiate tty")?,
+            ctx.command,
+            ctx.arguments,
+        )
+    };
+
+    ctx.authenticate();
 
     // std::process::Command::new(command).args(args).exec();
     Ok(())
