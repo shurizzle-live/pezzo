@@ -111,7 +111,8 @@ impl MatchContext {
     ) -> Result<Self> {
         let command = arguments.remove(0);
         let command = if let Ok(command) = which::which(&command) {
-            command.read_link()?
+            std::fs::canonicalize(&command)
+                .with_context(move || anyhow!("Cannot resolve path {:?}", command))?
         } else {
             bail!("Command {:?} not found.", command);
         };

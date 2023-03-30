@@ -1,4 +1,4 @@
-use std::{ffi::CStr, io, ptr};
+use std::{io, ptr};
 
 use super::super::super::{
     process::{Group, User},
@@ -31,7 +31,7 @@ impl ProcessContext {
 
         iam.set_effective_identity(uid, gid)?;
 
-        let exe = std::env::current_exe()?;
+        let exe = std::fs::canonicalize(std::env::current_exe()?)?;
         let proc_stat = Stat::current()?;
         let pid: u32 = proc_stat.pid;
         let sid: u32 = proc_stat.session;
