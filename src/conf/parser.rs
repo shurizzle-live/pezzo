@@ -5,7 +5,6 @@ use std::ffi::CString;
 pub enum Origin {
     User(Vec<CString>),
     Group(Vec<CString>),
-    UserGroup(Vec<CString>, Vec<CString>),
 }
 
 #[derive(Debug, Clone)]
@@ -202,8 +201,7 @@ peg::parser! {
             / group:group() { vec![group] }
 
         rule origin() -> Origin
-            = user:user_exp() _ [b':'] _ group:group_exp() { Origin::UserGroup(user, group) }
-            / [b':'] _ group:group_exp() { Origin::Group(group) }
+            = [b':'] _ group:group_exp() { Origin::Group(group) }
             / user:user_exp() { Origin::User(user) }
 
         rule origin_exp_cont() -> Origin

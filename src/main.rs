@@ -172,16 +172,6 @@ impl MatchContext {
                             self.proc.original_group.name() == g
                                 || self.proc.original_groups.iter().any(|og| og.name() == g)
                         }),
-                        Origin::UserGroup(users, groups) => {
-                            users
-                                .iter()
-                                .any(|u| self.proc.original_user.name() == u.as_c_str())
-                                && groups.iter().any(|g| {
-                                    let g = g.as_c_str();
-                                    self.proc.original_group.name() == g
-                                        || self.proc.original_groups.iter().any(|og| og.name() == g)
-                                })
-                        }
                     });
 
                     if !groups_match {
