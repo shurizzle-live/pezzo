@@ -264,12 +264,10 @@ fn _main() -> Result<()> {
             let mut groups = ctx
                 .get_group_ids(ctx.target_user().name().to_bytes())
                 .context("Cannot get user groups")?;
-            if !groups.iter().any(|&g| g == default_gid) {
-                groups.push(default_gid);
-            }
-            if !groups.iter().any(|&g| g == gid) {
-                groups.push(gid);
-            }
+            groups.push(default_gid);
+            groups.push(gid);
+            groups.sort();
+            groups.dedup();
             ctx.set_groups(groups.as_slice())
                 .context("Cannot set process groups")?;
         }
