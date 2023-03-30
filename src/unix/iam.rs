@@ -1,6 +1,6 @@
 use std::{ffi::CStr, io};
 
-use super::{Group, User, __errno};
+use super::{Group, Pwd, User, __errno};
 
 #[derive(Debug)]
 pub struct IAMContext;
@@ -16,18 +16,28 @@ impl IAMContext {
         Ok(Self)
     }
 
-    pub fn default_user(&self) -> io::Result<User> {
-        Ok(User {
-            name: unsafe {
-                CStr::from_ptr(b"root\0".as_ptr() as *const _)
-                    .to_owned()
-                    .into_boxed_c_str()
-            },
-            id: 0,
-        })
+    #[inline]
+    pub fn default_user(&self) -> io::Result<Option<Pwd>> {
+        self.pwd_by_id(0)
     }
 
-    pub fn user_id_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<u32>> {
+    fn convert_pwd(raw: *const libc::passwd) -> Pwd {
+        unsafe {
+            let uid = (*raw).pw_uid;
+            let gid = (*raw).pw_gid;
+            let name = CStr::from_ptr((*raw).pw_name).to_owned().into_boxed_c_str();
+            let home = CStr::from_ptr((*raw).pw_dir).to_owned().into_boxed_c_str();
+
+            Pwd {
+                uid,
+                gid,
+                name,
+                home,
+            }
+        }
+    }
+
+    fn raw_pwd_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<*const libc::passwd>> {
         let name = name.as_ref();
 
         unsafe {
@@ -40,12 +50,12 @@ impl IAMContext {
                     Err(io::Error::last_os_error())
                 }
             } else {
-                Ok(Some((*pwd).pw_uid))
+                Ok(Some(pwd))
             }
         }
     }
 
-    pub fn user_name_by_id(&self, uid: u32) -> io::Result<Option<Box<CStr>>> {
+    fn raw_pwd_by_uid(&self, uid: u32) -> io::Result<Option<*const libc::passwd>> {
         unsafe {
             *__errno() = 0;
             let pwd = libc::getpwuid(uid);
@@ -56,11 +66,53 @@ impl IAMContext {
                     Err(io::Error::last_os_error())
                 }
             } else {
-                Ok(Some(
-                    CStr::from_ptr((*pwd).pw_name).to_owned().into_boxed_c_str(),
-                ))
+                Ok(Some(pwd))
             }
         }
+    }
+
+    pub fn user_id_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<u32>> {
+        self.raw_pwd_by_name(name)
+            .map(|o| o.map(|pwd| unsafe { (*pwd).pw_uid }))
+    }
+
+    pub fn pwd_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<Pwd>> {
+        Ok(self.raw_pwd_by_name(name)?.map(Self::convert_pwd))
+    }
+
+    pub fn pwd_by_id(&self, id: u32) -> io::Result<Option<Pwd>> {
+        Ok(self.raw_pwd_by_uid(id)?.map(Self::convert_pwd))
+    }
+
+    pub fn user_id_home_by_name<S: AsRef<CStr>>(
+        &self,
+        name: S,
+    ) -> io::Result<Option<(u32, Box<CStr>)>> {
+        self.raw_pwd_by_name(name).map(|o| {
+            o.map(|pwd| unsafe {
+                (
+                    (*pwd).pw_uid,
+                    CStr::from_ptr((*pwd).pw_dir).to_owned().into_boxed_c_str(),
+                )
+            })
+        })
+    }
+
+    pub fn user_name_home_by_id(&self, uid: u32) -> io::Result<Option<(Box<CStr>, Box<CStr>)>> {
+        self.raw_pwd_by_uid(uid).map(|o| {
+            o.map(|pwd| unsafe {
+                (
+                    CStr::from_ptr((*pwd).pw_name).to_owned().into_boxed_c_str(),
+                    CStr::from_ptr((*pwd).pw_dir).to_owned().into_boxed_c_str(),
+                )
+            })
+        })
+    }
+
+    pub fn user_name_by_id(&self, uid: u32) -> io::Result<Option<Box<CStr>>> {
+        self.raw_pwd_by_uid(uid).map(|o| {
+            o.map(|pwd| unsafe { CStr::from_ptr((*pwd).pw_name).to_owned().into_boxed_c_str() })
+        })
     }
 
     pub fn group_id_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<u32>> {
@@ -103,6 +155,31 @@ impl IAMContext {
             Some(id) => Ok(User { id, name }),
             None => Err(name),
         })
+    }
+
+    pub fn user_by_id(&self, id: u32) -> io::Result<Option<User>> {
+        self.user_name_by_id(id)
+            .map(|o| o.map(|name| User { id, name }))
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn user_home_by_name(
+        &self,
+        name: Box<CStr>,
+    ) -> io::Result<Result<(User, Box<CStr>), Box<CStr>>> {
+        Ok(match self.user_id_home_by_name(name.as_ref())? {
+            Some((id, home)) => Ok((User { id, name }, home)),
+            None => Err(name),
+        })
+    }
+
+    pub fn user_home_by_id(&self, id: u32) -> io::Result<Option<(User, Box<CStr>)>> {
+        self.user_name_home_by_id(id)
+            .map(|o| o.map(|(name, home)| (User { id, name }, home)))
+    }
+
+    pub fn group_by_id(&self, id: u32) -> io::Result<Option<Group>> {
+        Ok(self.group_name_by_id(id)?.map(|name| Group { id, name }))
     }
 
     pub fn group_by_name(&self, name: Box<CStr>) -> io::Result<Result<Group, Box<CStr>>> {
@@ -209,10 +286,10 @@ impl IAMContext {
 
     pub fn set_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
         unsafe {
-            if libc::setuid(uid) == -1 {
+            if libc::setgid(gid) == -1 {
                 return Err(io::Error::last_os_error());
             }
-            if libc::setgid(gid) == -1 {
+            if libc::setuid(uid) == -1 {
                 return Err(io::Error::last_os_error());
             }
         }
@@ -221,10 +298,10 @@ impl IAMContext {
 
     pub fn set_effective_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
         unsafe {
-            if libc::seteuid(uid) == -1 {
+            if libc::setegid(gid) == -1 {
                 return Err(io::Error::last_os_error());
             }
-            if libc::setegid(gid) == -1 {
+            if libc::seteuid(uid) == -1 {
                 return Err(io::Error::last_os_error());
             }
         }
@@ -233,6 +310,26 @@ impl IAMContext {
 
     #[inline]
     pub fn escalate_permissions(&self) -> io::Result<()> {
-        self.set_effective_identity(0, 0)
+        unsafe {
+            if libc::seteuid(0) == -1 {
+                return Err(io::Error::last_os_error());
+            }
+            if libc::setegid(0) == -1 {
+                return Err(io::Error::last_os_error());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_groups<B: AsRef<[u32]>>(&self, groups: B) -> io::Result<()> {
+        let groups = groups.as_ref();
+        unsafe {
+            let rc = libc::setgroups(groups.len(), groups.as_ptr());
+            if rc == -1 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(())
+            }
+        }
     }
 }

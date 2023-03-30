@@ -22,6 +22,13 @@ pub use tty::TtyInfo;
 
 use self::tty::{TtyIn, TtyOut};
 
+pub struct Pwd {
+    pub name: Box<CStr>,
+    pub uid: u32,
+    pub home: Box<CStr>,
+    pub gid: u32,
+}
+
 #[cfg(target_os = "linux")]
 #[inline(always)]
 #[doc(hidden)]
@@ -43,7 +50,7 @@ pub struct Context {
     tty_in: Arc<Mutex<TtyIn>>,
     tty_out: Arc<Mutex<TtyOut>>,
     target_user: User,
-    target_group: Option<Group>,
+    target_group: Group,
 }
 
 impl Context {
@@ -51,7 +58,7 @@ impl Context {
         iam: IAMContext,
         proc_ctx: ProcessContext,
         target_user: User,
-        target_group: Option<Group>,
+        target_group: Group,
     ) -> io::Result<Self> {
         let tty_ctx = TtyInfo::for_ttyno(proc_ctx.ttyno)?;
         let tty_in = Arc::new(Mutex::new(tty_ctx.open_in()?));
@@ -94,8 +101,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn target_group(&self) -> Option<&Group> {
-        self.target_group.as_ref()
+    pub fn target_group(&self) -> &Group {
+        &self.target_group
     }
 
     #[inline]
@@ -154,17 +161,15 @@ impl Context {
         )
     }
 
+    // TODO: implement proper error handling
     pub fn authenticate(&self) {
         let out = self.tty_out();
 
-        {
-            let uid = self.target_user.id();
-            let gid = self
-                .target_group()
-                .map(|g| g.id)
-                .unwrap_or_else(|| self.original_group().id);
-            self.iam.set_effective_identity(uid, gid).unwrap();
-        }
+        // {
+        //     let uid = self.target_user.id();
+        //     let gid = self.target_group().id();
+        //     self.iam.set_effective_identity(uid, gid).unwrap();
+        // }
 
         let mut auth = self.authenticator().unwrap();
 
@@ -188,5 +193,30 @@ impl Context {
             }
         }
         std::process::exit(1);
+    }
+
+    #[inline]
+    pub fn escalate_permissions(&self) -> io::Result<()> {
+        self.iam.escalate_permissions()
+    }
+
+    #[inline]
+    pub fn set_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
+        self.iam.set_identity(uid, gid)
+    }
+
+    #[inline]
+    pub fn set_effective_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
+        self.iam.set_effective_identity(uid, gid)
+    }
+
+    #[inline]
+    pub fn set_groups<B: AsRef<[u32]>>(&self, groups: B) -> io::Result<()> {
+        self.iam.set_groups(groups)
+    }
+
+    #[inline]
+    pub fn get_group_ids<B: AsRef<[u8]>>(&self, user_name: B) -> io::Result<Vec<u32>> {
+        self.iam.get_group_ids(user_name)
     }
 }

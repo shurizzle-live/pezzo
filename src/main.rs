@@ -1,5 +1,6 @@
 use std::{
-    ffi::{CStr, CString, OsString},
+    ffi::{CStr, CString, OsStr, OsString},
+    os::unix::{prelude::OsStrExt, process::CommandExt},
     path::{Path, PathBuf},
 };
 
@@ -96,7 +97,9 @@ pub struct MatchContext {
     command: PathBuf,
     arguments: Vec<OsString>,
     target_user: User,
-    target_group: Option<Group>,
+    target_group: Group,
+    target_home: Box<CStr>,
+    default_gid: u32,
     iam: IAMContext,
     proc: ProcessContext,
 }
@@ -117,21 +120,28 @@ impl MatchContext {
             bail!("Command {:?} not found.", command);
         };
 
-        let target_user = user.map_or_else(
-            || iam.default_user().context("Cannot get root informations."),
-            |name| {
-                iam.user_by_name(name)
-                    .context("Cannot get users informations.")?
-                    .map_err(|name| anyhow!("Invalid user {:?}", name))
-            },
-        )?;
+        let pwd = if let Some(name) = user {
+            iam.pwd_by_name(name.as_ref())
+                .context("Cannot get users informations.")?
+                .ok_or_else(|| anyhow!("Invalid user {:?}", name))?
+        } else {
+            iam.default_user()
+                .context("Cannot get groups informations")?
+                .ok_or_else(|| anyhow!("Invalid root user"))?
+        };
+
+        let (target_user, default_gid, target_home) =
+            (User::new(pwd.uid, pwd.name), pwd.gid, pwd.home);
 
         let target_group = group.map_or_else(
-            || Ok(None),
+            || {
+                iam.group_by_id(default_gid)
+                    .context("Cannot get groups informations.")?
+                    .ok_or_else(|| anyhow!("Invalid group {}", default_gid))
+            },
             |name| {
                 iam.group_by_name(name)
                     .context("Cannot get groups informations.")?
-                    .map(Some)
                     .map_err(|name| anyhow!("Invalid group {:?}", name))
             },
         )?;
@@ -141,6 +151,8 @@ impl MatchContext {
             arguments,
             target_user,
             target_group,
+            target_home,
+            default_gid,
             iam,
             proc,
         })
@@ -187,10 +199,9 @@ impl MatchContext {
                                 users
                                     .iter()
                                     .any(|u| self.target_user.name() == u.as_c_str())
-                                    && self.target_group.as_ref().map_or(true, |target_group| {
-                                        let target_group = target_group.name();
-                                        groups.iter().any(|u| target_group == u.as_c_str())
-                                    })
+                                    && groups
+                                        .iter()
+                                        .any(|u| self.target_group.name() == u.as_c_str())
                             }
                         })
                     } else {
@@ -239,18 +250,56 @@ fn _main() -> Result<()> {
         .escalate_permissions()
         .context("Cannot set root permissions.")?;
 
-    let (ctx, _command, _arguments) = {
+    let (ctx, command, arguments, home, default_gid) = {
         (
             pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group)
                 .context("Cannot instantiate tty")?,
             ctx.command,
             ctx.arguments,
+            ctx.target_home,
+            ctx.default_gid,
         )
     };
 
     ctx.authenticate();
 
-    // std::process::Command::new(command).args(args).exec();
+    ctx.escalate_permissions()
+        .context("Cannot set root permissions.")?;
+
+    {
+        let uid = ctx.target_user().id();
+        let gid = ctx.target_group().id();
+
+        {
+            let mut groups = ctx
+                .get_group_ids(ctx.target_user().name().to_bytes())
+                .context("Cannot get user groups.")?;
+            if !groups.iter().any(|&g| g == default_gid) {
+                groups.push(default_gid);
+            }
+            if !groups.iter().any(|&g| g == gid) {
+                groups.push(gid);
+            }
+            ctx.set_groups(groups.as_slice())
+                .context("Cannot set process groups.")?;
+        }
+
+        ctx.set_identity(uid, gid)
+            .context("Cannot set uid and gid.")?;
+
+        ctx.set_effective_identity(uid, gid)
+            .context("Cannot set euid and egid.")?;
+    }
+
+    std::process::Command::new(command)
+        .args(arguments)
+        .env_clear()
+        .env("HOME", OsStr::from_bytes(home.as_ref().to_bytes()))
+        .env(
+            "PATH",
+            OsStr::from_bytes(b"/usr/local/sbin:/usr/local/bin:/usr/bin".as_slice()),
+        )
+        .exec();
     Ok(())
 }
 

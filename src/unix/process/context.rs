@@ -14,6 +14,11 @@ pub struct Group {
 
 impl User {
     #[inline]
+    pub fn new(id: u32, name: Box<CStr>) -> User {
+        User { id, name }
+    }
+
+    #[inline]
     pub fn name(&self) -> &CStr {
         self.name.as_ref()
     }
