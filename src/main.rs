@@ -50,7 +50,7 @@ fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
         Ok(md) => {
             if md.st_uid() != 0 || (md.permissions().mode() & 0o022) != 0 {
                 bail!(
-                    "Wrong permissions on file '{}`. Your system has been compromised.",
+                    "Wrong permissions on file '{}`. Your system has been compromised",
                     path.display()
                 );
             }
@@ -68,7 +68,7 @@ fn parse_conf<P: AsRef<Path>>(path: P) -> Result<pezzo::conf::Rules> {
 
     check_file_permissions(path)?;
 
-    let content = pezzo::util::slurp(path).context("Cannot read configuration file.")?;
+    let content = pezzo::util::slurp(path).context("Cannot read configuration file")?;
     match pezzo::conf::parse(&content) {
         Ok(c) => Ok(c),
         Err(err) => {
@@ -117,12 +117,12 @@ impl MatchContext {
             std::fs::canonicalize(&command)
                 .with_context(move || anyhow!("Cannot resolve path {:?}", command))?
         } else {
-            bail!("Command {:?} not found.", command);
+            bail!("Command {:?} not found", command);
         };
 
         let pwd = if let Some(name) = user {
             iam.pwd_by_name(name.as_ref())
-                .context("Cannot get users informations.")?
+                .context("Cannot get users informations")?
                 .ok_or_else(|| anyhow!("Invalid user {:?}", name))?
         } else {
             iam.default_user()
@@ -136,12 +136,12 @@ impl MatchContext {
         let target_group = group.map_or_else(
             || {
                 iam.group_by_id(default_gid)
-                    .context("Cannot get groups informations.")?
+                    .context("Cannot get groups informations")?
                     .ok_or_else(|| anyhow!("Invalid group {}", default_gid))
             },
             |name| {
                 iam.group_by_name(name)
-                    .context("Cannot get groups informations.")?
+                    .context("Cannot get groups informations")?
                     .map_err(|name| anyhow!("Invalid group {:?}", name))
             },
         )?;
@@ -213,10 +213,10 @@ impl MatchContext {
 }
 
 fn _main() -> Result<()> {
-    let iam = IAMContext::new().context("Cannot initialize users and groups.")?;
+    let iam = IAMContext::new().context("Cannot initialize users and groups")?;
 
     iam.escalate_permissions()
-        .context("Cannot set root permissions.")?;
+        .context("Cannot set root permissions")?;
 
     let proc = ProcessContext::current(&iam).context("Cannot get process informations")?;
 
@@ -233,12 +233,12 @@ fn _main() -> Result<()> {
     let rules = parse_conf("pezzo.conf")?;
 
     if !ctx.matches(&rules) {
-        bail!("Cannot match any rule.");
+        bail!("Cannot match any rule");
     }
 
     ctx.iam
         .escalate_permissions()
-        .context("Cannot set root permissions.")?;
+        .context("Cannot set root permissions")?;
 
     let (ctx, command, arguments, home, default_gid) = {
         (
@@ -254,7 +254,7 @@ fn _main() -> Result<()> {
     ctx.authenticate();
 
     ctx.escalate_permissions()
-        .context("Cannot set root permissions.")?;
+        .context("Cannot set root permissions")?;
 
     {
         let uid = ctx.target_user().id();
@@ -263,7 +263,7 @@ fn _main() -> Result<()> {
         {
             let mut groups = ctx
                 .get_group_ids(ctx.target_user().name().to_bytes())
-                .context("Cannot get user groups.")?;
+                .context("Cannot get user groups")?;
             if !groups.iter().any(|&g| g == default_gid) {
                 groups.push(default_gid);
             }
@@ -271,14 +271,14 @@ fn _main() -> Result<()> {
                 groups.push(gid);
             }
             ctx.set_groups(groups.as_slice())
-                .context("Cannot set process groups.")?;
+                .context("Cannot set process groups")?;
         }
 
         ctx.set_identity(uid, gid)
-            .context("Cannot set uid and gid.")?;
+            .context("Cannot set uid and gid")?;
 
         ctx.set_effective_identity(uid, gid)
-            .context("Cannot set euid and egid.")?;
+            .context("Cannot set euid and egid")?;
     }
 
     std::process::Command::new(command)
@@ -295,7 +295,7 @@ fn _main() -> Result<()> {
 
 fn main() {
     if let Err(err) = _main() {
-        eprintln!("{}", err);
+        eprintln!("{}.", err);
         std::process::exit(1);
     }
 }
