@@ -324,7 +324,7 @@ impl IAMContext {
     pub fn set_groups<B: AsRef<[u32]>>(&self, groups: B) -> io::Result<()> {
         let groups = groups.as_ref();
         unsafe {
-            let rc = libc::setgroups(groups.len(), groups.as_ptr());
+            let rc = libc::setgroups(groups.len() as _, groups.as_ptr());
             if rc == -1 {
                 Err(io::Error::last_os_error())
             } else {
