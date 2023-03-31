@@ -1,4 +1,5 @@
 pub mod proc;
+pub mod time;
 pub mod tty;
 
 pub use proc::context::*;

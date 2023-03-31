@@ -20,7 +20,12 @@ pub use iam::IAMContext;
 pub use process::*;
 pub use tty::TtyInfo;
 
-use self::tty::{TtyIn, TtyOut};
+use crate::database::{Database, Entry};
+
+use self::{
+    linux::time,
+    tty::{TtyIn, TtyOut},
+};
 
 pub struct Pwd {
     pub name: Box<CStr>,
@@ -165,16 +170,32 @@ impl Context {
     pub fn authenticate(&self) {
         let out = self.tty_out();
 
-        // {
-        //     let uid = self.target_user.id();
-        //     let gid = self.target_group().id();
-        //     self.iam.set_effective_identity(uid, gid).unwrap();
-        // }
+        {
+            let db = Database::new(self.original_user().name()).unwrap();
+            if let Some(entry) = db
+                .iter()
+                .find(|&e| e.session_id() == self.proc_ctx.sid && e.tty() == self.ttyno())
+            {
+                let time = time::now().unwrap();
+                if (entry.last_login()..=(entry.last_login() + 600)).contains(&time) {
+                    return;
+                }
+            }
+        }
 
         let mut auth = self.authenticator().unwrap();
 
         for i in 1..=self.max_retries() {
             if matches!(auth.authenticate(), Ok(_)) {
+                let mut db = Database::new(self.original_user().name()).unwrap();
+                db.retain(|e| e.session_id() != self.proc_ctx.sid && e.tty() != self.ttyno());
+                db.push(Entry {
+                    session_id: self.proc_ctx.sid,
+                    tty: self.ttyno(),
+                    last_login: time::now().unwrap(),
+                });
+                db.save().unwrap();
+
                 return;
             }
 
