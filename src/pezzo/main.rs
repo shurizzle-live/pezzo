@@ -46,7 +46,7 @@ fn _main() -> Result<()> {
 
     let rules = parse_conf("pezzo.conf")?;
 
-    if !ctx.matches(&rules) {
+    if !ctx.matches(&rules)? {
         bail!("Cannot match any rule");
     }
 
@@ -54,14 +54,13 @@ fn _main() -> Result<()> {
         .escalate_permissions()
         .context("Cannot set root permissions")?;
 
-    let (ctx, command, arguments, home, default_gid) = {
+    let (ctx, command, arguments, home) = {
         (
             pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group)
                 .context("Cannot instantiate tty")?,
             ctx.command,
             ctx.arguments,
             ctx.target_home,
-            ctx.default_gid,
         )
     };
 
@@ -76,12 +75,11 @@ fn _main() -> Result<()> {
 
         {
             let mut groups = ctx
-                .get_group_ids(ctx.target_user().name().to_bytes())
+                .get_group_ids(ctx.target_user().name())
                 .context("Cannot get user groups")?;
-            groups.push(default_gid);
-            groups.push(gid);
-            groups.sort();
-            groups.dedup();
+            if let Err(pos) = groups.binary_search(&gid) {
+                groups.insert(pos, gid);
+            }
             ctx.set_groups(groups.as_slice())
                 .context("Cannot set process groups")?;
         }

@@ -216,7 +216,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_group_ids<B: AsRef<[u8]>>(&self, user_name: B) -> io::Result<Vec<u32>> {
+    pub fn get_group_ids<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<u32>> {
         self.iam.get_group_ids(user_name)
     }
 }
