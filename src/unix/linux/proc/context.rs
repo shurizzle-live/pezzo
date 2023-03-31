@@ -59,7 +59,7 @@ impl ProcessContext {
             id: gid,
         };
 
-        let original_groups = iam.get_groups(original_user.name().to_bytes())?;
+        let original_groups = iam.get_groups(original_user.name())?;
 
         Ok(Self {
             exe,
