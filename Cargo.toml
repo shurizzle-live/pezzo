@@ -6,6 +6,10 @@ name = "pezzo"
 version = "0.0.1"
 edition = "2021"
 
+[[bin]]
+name = "pezzo"
+path = "src/pezzo/main.rs"
+
 [profile.release]
 strip = true
 opt-level = "z"
