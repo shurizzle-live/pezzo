@@ -23,25 +23,25 @@ impl fmt::Display for Version {
 #[macro_export]
 macro_rules! version {
     (>  $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version()  > version!($($rest)+)
+        $crate::unix::linux::kernel_version()  > $crate::version!($($rest)+)
     };
     (<  $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version()  < version!($($rest)+)
+        $crate::unix::linux::kernel_version()  < $crate::version!($($rest)+)
     };
     (== $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version() == version!($($rest)+)
+        $crate::unix::linux::kernel_version() == $crate::version!($($rest)+)
     };
     (>= $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version() >= version!($($rest)+)
+        $crate::unix::linux::kernel_version() >= $crate::version!($($rest)+)
     };
     (<= $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version() <= version!($($rest)+)
+        $crate::unix::linux::kernel_version() <= $crate::version!($($rest)+)
     };
     ($major:expr) => {
-        version!($major, 0)
+        $crate::version!($major, 0)
     };
     ($major:expr, $minor:expr) => {
-        version!($major, $minor, 0)
+        $crate::version!($major, $minor, 0)
     };
     ($major:expr, $minor:expr, $revision:expr) => {
         $crate::unix::linux::Version {
