@@ -1,7 +1,4 @@
-use std::{
-    io,
-    mem::{self, MaybeUninit},
-};
+use std::mem::{self, MaybeUninit};
 
 pub fn now() -> u64 {
     unsafe {
