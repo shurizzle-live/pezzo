@@ -175,7 +175,7 @@ impl Context {
                 .find(|&e| e.session_id() == self.proc_ctx.sid && e.tty() == self.ttyno())
             {
                 let time = time::now();
-                if (entry.last_login()..=(entry.last_login() + 600)).contains(&time) {
+                if (entry.last_login()..=(entry.last_login() + 300)).contains(&time) {
                     return;
                 }
             }
