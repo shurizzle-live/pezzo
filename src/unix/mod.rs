@@ -19,13 +19,11 @@ mod process;
 pub use iam::IAMContext;
 pub use process::*;
 pub use tty::TtyInfo;
+pub mod time;
 
 use crate::database::{Database, Entry};
 
-use self::{
-    linux::time,
-    tty::{TtyIn, TtyOut},
-};
+use self::tty::{TtyIn, TtyOut};
 
 pub struct Pwd {
     pub name: Box<CStr>,
@@ -176,7 +174,7 @@ impl Context {
                 .iter()
                 .find(|&e| e.session_id() == self.proc_ctx.sid && e.tty() == self.ttyno())
             {
-                let time = time::now().unwrap();
+                let time = time::now();
                 if (entry.last_login()..=(entry.last_login() + 600)).contains(&time) {
                     return;
                 }
@@ -192,7 +190,7 @@ impl Context {
                 db.push(Entry {
                     session_id: self.proc_ctx.sid,
                     tty: self.ttyno(),
-                    last_login: time::now().unwrap(),
+                    last_login: time::now(),
                 });
                 db.save().unwrap();
 

@@ -1,14 +1,13 @@
-use std::{io, mem::MaybeUninit};
+use std::{
+    io,
+    mem::{self, MaybeUninit},
+};
 
-pub fn now() -> io::Result<i64> {
+pub fn now() -> u64 {
     unsafe {
         let mut time = MaybeUninit::<libc::timespec>::uninit();
-        let rc = libc::clock_gettime(libc::CLOCK_BOOTTIME, time.as_mut_ptr());
-        if rc == -1 {
-            return Err(io::Error::last_os_error());
-        }
-
+        libc::clock_gettime(libc::CLOCK_BOOTTIME, time.as_mut_ptr());
         let time = time.assume_init();
-        Ok(time.tv_sec)
+        mem::transmute(time.tv_sec)
     }
 }

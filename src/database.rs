@@ -17,7 +17,7 @@ use fs4::FileExt;
 pub struct RawEntry {
     pub session_id: u32,
     pub tty: u32,
-    pub last_login: i64,
+    pub last_login: u64,
 }
 
 #[repr(transparent)]
@@ -45,7 +45,7 @@ impl BorrowedEntry {
     }
 
     #[inline]
-    pub fn last_login(&self) -> i64 {
+    pub fn last_login(&self) -> u64 {
         unsafe { (*self.inner()).last_login }
     }
 
@@ -64,7 +64,7 @@ impl BorrowedEntry {
     }
 
     #[inline]
-    pub fn set_last_login(&mut self, value: i64) {
+    pub fn set_last_login(&mut self, value: u64) {
         unsafe {
             (*self.inner_mut()).last_login = value;
         }
@@ -75,7 +75,7 @@ impl BorrowedEntry {
 pub struct Entry {
     pub session_id: u32,
     pub tty: u32,
-    pub last_login: i64,
+    pub last_login: u64,
 }
 
 impl From<Entry> for RawEntry {
