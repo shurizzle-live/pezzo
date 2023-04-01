@@ -44,7 +44,7 @@ fn _main() -> Result<()> {
 
     let ctx = MatchContext::new(iam, proc, user, group, args)?;
 
-    let rules = parse_conf("pezzo.conf")?;
+    let rules = parse_conf("/etc/pezzo.conf")?;
 
     if !ctx.matches(&rules)? {
         bail!("Cannot match any rule");
