@@ -138,7 +138,7 @@ pub mod time {
     pub fn now() -> u64 {
         unsafe {
             let mut time = MaybeUninit::<libc::timespec>::uninit();
-            libc::clock_gettime(libc::CLOCK_UPTIME_RAW, time.as_mut_ptr());
+            libc::clock_gettime(libc::CLOCK_MONOTONIC_RAW, time.as_mut_ptr());
             let time = time.assume_init();
             mem::transmute(time.tv_sec)
         }
