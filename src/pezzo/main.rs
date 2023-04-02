@@ -95,6 +95,7 @@ fn _main() -> Result<()> {
             .context("Cannot set euid and egid")?;
     }
 
+    let cmd = command.display().to_string();
     std::process::Command::new(command)
         .args(arguments)
         .env_clear()
@@ -103,6 +104,13 @@ fn _main() -> Result<()> {
             "PATH",
             OsStr::from_bytes(b"/usr/local/sbin:/usr/local/bin:/usr/bin".as_slice()),
         )
+        .env("SUDO_COMMAND", cmd)
+        .env(
+            "SUDO_USER",
+            OsStr::from_bytes(ctx.original_user().name().to_bytes()),
+        )
+        .env("SUDO_UID", ctx.original_user().id().to_string())
+        .env("SUDO_GID", ctx.original_group().id().to_string())
         .exec();
     Ok(())
 }
