@@ -11,13 +11,20 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
-use pezzo::unix::{IAMContext, ProcessContext};
+use pezzo::{
+    database::Database,
+    unix::{IAMContext, ProcessContext},
+};
 
 extern crate pezzo;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
+    #[arg(short = 'K', long, exclusive(true))]
+    pub remove_timestamp: bool,
+    #[arg(short = 'k', long, exclusive(true))]
+    pub reset_timestamp: bool,
     #[arg(short, long, value_parser = parse_box_c_str, value_name = "USER")]
     pub user: Option<Box<CStr>>,
     #[arg(short, long, value_parser = parse_box_c_str, value_name = "GROUP")]
@@ -37,10 +44,28 @@ fn _main() -> Result<()> {
     check_file_permissions(&proc.exe)?;
 
     let Cli {
+        remove_timestamp,
+        reset_timestamp,
         user,
         group,
         command: args,
     } = Cli::parse();
+
+    if remove_timestamp {
+        iam.escalate_permissions()
+            .context("Cannot set root permissions")?;
+        Database::delete(proc.original_user.name()).context("Cannot access database")?;
+        return Ok(());
+    }
+
+    if reset_timestamp {
+        iam.escalate_permissions()
+            .context("Cannot set root permissions")?;
+        let mut db = Database::new(proc.original_user.name()).context("Cannot open database")?;
+        db.retain(|e| e.session_id() != proc.sid && e.tty() != proc.ttyno);
+        db.save().context("Cannot save database")?;
+        return Ok(());
+    }
 
     let ctx = MatchContext::new(iam, proc, user, group, args)?;
 

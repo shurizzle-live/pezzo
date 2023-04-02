@@ -260,6 +260,19 @@ impl Database {
     pub fn iter(&self) -> Iter {
         self.into_iter()
     }
+
+    #[inline]
+    pub fn delete<S: Into<CString>>(user: S) -> io::Result<()> {
+        let user = user.into();
+
+        create_base()?;
+
+        let path = PathBuf::from(BASE_PATH).join(OsStr::from_bytes(user.to_bytes()));
+        match std::fs::remove_file(path) {
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+            other => other,
+        }
+    }
 }
 
 impl<'a> Iterator for Iter<'a> {
