@@ -11,6 +11,24 @@ use pezzo::{
     unix::{Group, IAMContext, ProcessContext, User},
 };
 
+#[derive(Debug, Default)]
+pub struct MatchResult {
+    timeout: Option<u64>,
+    askpass: Option<bool>,
+}
+
+impl MatchResult {
+    #[inline]
+    pub fn timeout(&self) -> Option<u64> {
+        self.timeout
+    }
+
+    #[inline]
+    pub fn askpass(&self) -> Option<bool> {
+        self.askpass
+    }
+}
+
 #[derive(Debug)]
 pub struct MatchContext {
     pub(crate) command: PathBuf,
@@ -116,7 +134,7 @@ impl MatchContext {
         }
     }
 
-    pub fn matches(&self, conf: &pezzo::conf::Rules) -> Result<bool> {
+    pub fn matches(&self, conf: &pezzo::conf::Rules) -> Result<Option<MatchResult>> {
         let mut last = None;
 
         for rule in conf.rules().iter() {
@@ -198,10 +216,13 @@ impl MatchContext {
                 .as_ref()
                 .map_or(true, |exe| exe.is_match(&self.command))
             {
-                last = Some(rule);
+                last = Some(MatchResult {
+                    timeout: rule.timeout,
+                    askpass: rule.askpass,
+                });
             }
         }
 
-        Ok(last.is_some())
+        Ok(last)
     }
 }

@@ -46,9 +46,11 @@ fn _main() -> Result<()> {
 
     let rules = parse_conf("/etc/pezzo.conf")?;
 
-    if !ctx.matches(&rules)? {
+    let match_res = if let Some(res) = ctx.matches(&rules)? {
+        res
+    } else {
         bail!("Cannot match any rule");
-    }
+    };
 
     ctx.iam
         .escalate_permissions()
@@ -64,7 +66,9 @@ fn _main() -> Result<()> {
         )
     };
 
-    ctx.authenticate();
+    if match_res.askpass().unwrap_or(true) {
+        ctx.authenticate(match_res.timeout().unwrap_or(600));
+    }
 
     ctx.escalate_permissions()
         .context("Cannot set root permissions")?;

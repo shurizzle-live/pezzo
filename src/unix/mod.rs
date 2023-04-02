@@ -165,7 +165,7 @@ impl Context {
     }
 
     // TODO: implement proper error handling
-    pub fn authenticate(&self) {
+    pub fn authenticate(&self, timeout: u64) {
         let out = self.tty_out();
 
         {
@@ -175,7 +175,7 @@ impl Context {
                 .find(|&e| e.session_id() == self.proc_ctx.sid && e.tty() == self.ttyno())
             {
                 let time = time::now();
-                if (entry.last_login()..=(entry.last_login() + 300)).contains(&time) {
+                if (entry.last_login()..=(entry.last_login() + timeout)).contains(&time) {
                     return;
                 }
             }
