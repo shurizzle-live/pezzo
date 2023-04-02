@@ -17,12 +17,16 @@ struct Builder {
     origin: Option<Vec<Origin>>,
     target: Option<Vec<Target>>,
     exe: Option<GlobSet>,
+    timeout: Option<u64>,
+    askpass: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Rule {
     pub origin: Vec<Origin>,
     pub target: Option<Vec<Target>>,
+    pub timeout: Option<u64>,
+    pub askpass: Option<bool>,
     pub exe: Option<GlobSet>,
 }
 
@@ -33,6 +37,8 @@ impl From<Vec<Origin>> for Builder {
             origin: Some(origin),
             target: None,
             exe: None,
+            timeout: None,
+            askpass: None,
         }
     }
 }
@@ -44,6 +50,8 @@ impl From<Vec<Target>> for Builder {
             origin: None,
             target: Some(target),
             exe: None,
+            timeout: None,
+            askpass: None,
         }
     }
 }
@@ -55,6 +63,8 @@ impl From<GlobSet> for Builder {
             origin: None,
             target: None,
             exe: Some(exe),
+            timeout: None,
+            askpass: None,
         }
     }
 }
@@ -66,6 +76,8 @@ impl Builder {
             origin,
             target,
             exe,
+            timeout,
+            askpass,
         }: Self,
     ) -> Result<(), &'static str> {
         if let Some(origin) = origin {
@@ -86,6 +98,18 @@ impl Builder {
             }
             self.exe = Some(exe);
         }
+        if let Some(timeout) = timeout {
+            if self.timeout.is_some() {
+                return Err("timeout has already been defined");
+            }
+            self.timeout = Some(timeout);
+        }
+        if let Some(askpass) = askpass {
+            if self.askpass.is_some() {
+                return Err("askpass has already been defined");
+            }
+            self.askpass = Some(askpass);
+        }
         Ok(())
     }
 
@@ -95,10 +119,34 @@ impl Builder {
             Ok(Rule {
                 origin,
                 target: self.target,
+                timeout: self.timeout,
+                askpass: self.askpass,
                 exe: self.exe,
             })
         } else {
             Err("origin not defined in rule")
+        }
+    }
+
+    #[inline]
+    pub fn with_timeout(timeout: u64) -> Self {
+        Self {
+            origin: None,
+            target: None,
+            exe: None,
+            askpass: None,
+            timeout: Some(timeout),
+        }
+    }
+
+    #[inline]
+    pub fn with_askpass(ask: bool) -> Self {
+        Self {
+            origin: None,
+            target: None,
+            exe: None,
+            timeout: None,
+            askpass: Some(ask),
         }
     }
 }
@@ -142,6 +190,8 @@ peg::parser! {
             = o:origin_statement() { o }
             / t:target_statement() { t }
             / e:exe_statement() { e }
+            / t:timeout_statement() { t }
+            / a:askpass_statement() { a }
 
         rule origin_statement() -> Builder
             = "origin" _ "=" _ o:origin_exp() _ ";" { o.into() }
@@ -151,6 +201,24 @@ peg::parser! {
 
         rule exe_statement() -> Builder
             = "exe" _ "=" _ e:exe_expr() _ ";" { e.into() }
+
+        rule timeout_statement() -> Builder
+            = "timeout" _ "=" _ i:u64_literal() _ ";" { Builder::with_timeout(i) }
+
+        rule askpass_statement() -> Builder
+            = "askpass" _ "=" _ b:bool_literal() _ ";" { Builder::with_askpass(b) }
+
+        rule bool_literal() -> bool
+            = "true" { true }
+            / "false" { false }
+
+        rule u64_literal() -> u64
+            = i:$(([b'1'..=b'9'][b'0'..=b'9']*) / [b'0']) {?
+                std::str::from_utf8(i)
+                    .map_err(|_| "invalid integer")?
+                    .parse::<u64>()
+                    .map_err(|_| "invalid integer")
+            }
 
         rule exe_char() -> u8
             = [b'\\'] c:[b' ' | b'|' | b';' | b':'] { c }
