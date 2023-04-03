@@ -6,7 +6,7 @@ pub mod tty;
 #[macro_use]
 pub mod linux;
 #[cfg(target_os = "macos")]
-pub mod macos;
+pub mod bsd;
 use std::{
     ffi::CStr,
     io::{self, Write},
@@ -16,10 +16,14 @@ use std::{
 
 mod process;
 
+#[cfg(target_os = "macos")]
+pub use bsd::*;
+#[cfg(target_os = "linux")]
+pub use linux::*;
+
 pub use iam::IAMContext;
 pub use process::*;
 pub use tty::TtyInfo;
-pub mod time;
 
 use crate::database::{Database, Entry};
 
