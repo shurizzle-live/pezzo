@@ -263,6 +263,37 @@ impl<'a, C: Conversation> Drop for Authenticator<'a, C> {
     }
 }
 
+pub struct LinesIterator<'a> {
+    slice: Option<&'a [u8]>,
+}
+
+impl<'a> LinesIterator<'a> {
+    #[inline]
+    pub fn new(slice: &'a [u8]) -> Self {
+        Self { slice: Some(slice) }
+    }
+}
+
+impl<'a> Iterator for LinesIterator<'a> {
+    type Item = &'a [u8];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let s = self.slice.take()?;
+        if let Some(pos) = memchr::memchr2(b'\r', b'\n', s) {
+            let end = match unsafe { s.get_unchecked(pos) } {
+                b'\n' if matches!(s.get(pos + 1), Some(b'\r')) => pos + 2,
+                b'\r' if matches!(s.get(pos + 1), Some(b'\n')) => pos + 2,
+                _ => pos + 1,
+            };
+
+            self.slice = s.get(end..);
+            s.get(..pos)
+        } else {
+            Some(s)
+        }
+    }
+}
+
 pub struct PezzoConversation<'a> {
     name: &'a CStr,
     timedout: bool,
@@ -323,10 +354,27 @@ impl<'a> PezzoConversation<'a> {
         }
 
         if prompt_is_password(prompt, self.name) {
-            _ = self.print_prompt_password();
+            self.print_prompt_password()?;
         } else {
             let mut out = self.tty_out.lock().expect("tty is poisoned");
-            _ = out.write_all(prompt.to_bytes());
+            let mut it = LinesIterator::new(prompt.to_bytes());
+            if let Some(mut prev) = it.next() {
+                for mut line in it {
+                    mem::swap(&mut line, &mut prev);
+
+                    out.write_all(line).map_err(|_| ConvError::Conversation)?;
+                    out.write_all(b"\r\n")
+                        .map_err(|_| ConvError::Conversation)?;
+                }
+                let line = prev;
+                if !line.is_empty() {
+                    out.write_all(line).map_err(|_| ConvError::Conversation)?;
+                    if unsafe { *line.get_unchecked(line.len() - 1) } != b' ' {
+                        out.write_all(b" ").map_err(|_| ConvError::Conversation)?;
+                    }
+                }
+            }
+
             _ = out.flush();
         }
 
@@ -371,14 +419,34 @@ impl<'a> PezzoConversation<'a> {
         Ok(buf)
     }
 
+    fn print_message(&mut self, message: &[u8]) -> ConvResult<()> {
+        let mut out = self.tty_out.lock().expect("tty is poisoned");
+        let mut it = LinesIterator::new(message);
+        if let Some(mut prev) = it.next() {
+            for mut line in it {
+                mem::swap(&mut line, &mut prev);
+
+                out.write_all(line).map_err(|_| ConvError::Conversation)?;
+                out.write_all(b"\r\n")
+                    .map_err(|_| ConvError::Conversation)?;
+            }
+            let line = prev;
+            if !line.is_empty() {
+                out.write_all(line).map_err(|_| ConvError::Conversation)?;
+                out.write_all(b"\r\n")
+                    .map_err(|_| ConvError::Conversation)?;
+            }
+        }
+        out.flush().map_err(|_| ConvError::Conversation)
+    }
+
     pub fn print_prompt_password(&mut self) -> ConvResult<()> {
         let mut out = self.tty_out.lock().expect("tty is poisoned");
-        write!(
-            out,
-            "[pezzo] Password for {}: ",
-            self.name.to_string_lossy(),
-        )
-        .map_err(|_| ConvError::Conversation)?;
+        out.write_all(b"[pezzo] Password for ")
+            .map_err(|_| ConvError::Conversation)?;
+        out.write_all(self.name.to_bytes())
+            .map_err(|_| ConvError::Conversation)?;
+        out.write_all(b": ").map_err(|_| ConvError::Conversation)?;
         out.flush().map_err(|_| ConvError::Conversation)
     }
 
@@ -408,17 +476,11 @@ impl<'a> Conversation for PezzoConversation<'a> {
         self._prompt(prompt, false)
     }
 
-    fn info(&mut self, prompt: &CStr) -> ConvResult<()> {
-        let mut out = self.tty_out.lock().expect("tty is poisoned");
-        _ = out.write_all(prompt.to_bytes());
-        _ = out.flush();
-        Ok(())
+    fn info(&mut self, message: &CStr) -> ConvResult<()> {
+        self.print_message(message.to_bytes())
     }
 
-    fn error(&mut self, prompt: &CStr) -> ConvResult<()> {
-        let mut out = self.tty_out.lock().expect("tty is poisoned");
-        _ = out.write_all(prompt.to_bytes());
-        _ = out.flush();
-        Ok(())
+    fn error(&mut self, message: &CStr) -> ConvResult<()> {
+        self.print_message(message.to_bytes())
     }
 }
