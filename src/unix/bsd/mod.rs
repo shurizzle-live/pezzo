@@ -57,6 +57,7 @@ fn proc_info<T>(mibs: &mut [libc::c_int]) -> io::Result<CBox<T>> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CBox<T>(*mut T);
 
 impl<T> CBox<T> {
