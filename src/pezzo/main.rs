@@ -21,13 +21,25 @@ extern crate pezzo;
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    #[arg(short = 'K', long, exclusive(true))]
+    // #[arg(
+    //     short = 'v',
+    //     long,
+    //     exclusive(true),
+    //     help("update user's timestamp without running a command")
+    // )]
+    // pub validate: bool,
+    #[arg(
+        short = 'K',
+        long,
+        exclusive(true),
+        help("remove timestamp file completely")
+    )]
     pub remove_timestamp: bool,
-    #[arg(short = 'k', long, exclusive(true))]
+    #[arg(short = 'k', long, exclusive(true), help("invalidate timestamp file"))]
     pub reset_timestamp: bool,
-    #[arg(short, long, value_parser = parse_box_c_str, value_name = "USER")]
+    #[arg(short, long, value_parser = parse_box_c_str, value_name = "USER", help("run command as specified user name or ID"))]
     pub user: Option<Box<CStr>>,
-    #[arg(short, long, value_parser = parse_box_c_str, value_name = "GROUP")]
+    #[arg(short, long, value_parser = parse_box_c_str, value_name = "GROUP", help("run command as the specified group name or ID"))]
     pub group: Option<Box<CStr>>,
     #[arg(trailing_var_arg(true), required(true))]
     pub command: Vec<OsString>,
