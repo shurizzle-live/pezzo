@@ -6,6 +6,7 @@ pub mod tty;
 #[macro_use]
 pub mod linux;
 #[cfg(target_os = "macos")]
+#[macro_use]
 pub mod bsd;
 use std::{
     ffi::CStr,

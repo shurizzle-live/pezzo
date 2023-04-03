@@ -3,6 +3,13 @@ mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::*;
 
+#[macro_export]
+macro_rules! prefix {
+    ($p:literal) => {
+        concat!("/usr/local", $p)
+    };
+}
+
 use std::{
     borrow::{Borrow, BorrowMut},
     ffi::CStr,

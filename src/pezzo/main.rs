@@ -81,7 +81,7 @@ fn _main() -> Result<()> {
 
     let ctx = MatchContext::new(iam, proc, user, group, args)?;
 
-    let rules = parse_conf("/etc/pezzo.conf")?;
+    let rules = parse_conf(pezzo::prefix!("/etc/pezzo.conf"))?;
 
     let match_res = if let Some(res) = ctx.matches(&rules)? {
         res

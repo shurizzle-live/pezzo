@@ -6,6 +6,13 @@ pub use proc::context::*;
 
 use std::fmt;
 
+#[macro_export]
+macro_rules! prefix {
+    ($p:literal) => {
+        $p
+    };
+}
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
     pub major: u32,
