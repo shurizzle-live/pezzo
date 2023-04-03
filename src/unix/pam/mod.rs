@@ -283,23 +283,27 @@ impl<'a> PezzoConversation<'a> {
     }
 
     fn _prompt(&mut self, prompt: &CStr, echo: bool) -> ConvResult<CBuffer> {
-        fn base_prompt_is_password(prompt: &CStr) -> bool {
+        fn base_prompt_is_password(prompt: &CStr, name: &CStr) -> bool {
             if let Some(rest) = prompt.to_bytes().strip_prefix(b"Password:") {
-                rest.is_empty() || rest == b" "
-            } else {
-                false
+                return rest.is_empty() || rest == b" ";
+            } else if let Some(rest) = prompt.to_bytes().get(name.to_bytes().len()..) {
+                if let Some(rest) = rest.strip_prefix(b"'s Password:") {
+                    return rest.is_empty() || rest == b" ";
+                }
             }
+
+            false
         }
 
         #[cfg(not(target_os = "linux"))]
         #[inline(always)]
-        fn prompt_is_password(prompt: &CStr) -> bool {
-            base_prompt_is_password(prompt)
+        fn prompt_is_password(prompt: &CStr, name: &CStr) -> bool {
+            base_prompt_is_password(prompt, name)
         }
 
         #[cfg(target_os = "linux")]
         #[inline(always)]
-        fn prompt_is_password(prompt: &CStr) -> bool {
+        fn prompt_is_password(prompt: &CStr, name: &CStr) -> bool {
             extern "C" {
                 fn dgettext(domainname: *const i8, msgid: *const i8) -> *const i8;
             }
@@ -314,11 +318,11 @@ impl<'a> PezzoConversation<'a> {
                         prompt.as_ptr(),
                         dgettext(DOMAIN, "Password: ".as_ptr() as *const i8),
                     ) == 0
-                    || base_prompt_is_password(prompt)
+                    || base_prompt_is_password(prompt, name)
             }
         }
 
-        if prompt_is_password(prompt) {
+        if prompt_is_password(prompt, self.name) {
             _ = self.print_prompt_password();
         } else {
             let mut out = self.tty_out.lock().expect("tty is poisoned");
