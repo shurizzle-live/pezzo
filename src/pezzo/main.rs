@@ -12,6 +12,7 @@ use std::{
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use pezzo::{
+    conf::Env,
     database::Database,
     unix::{IAMContext, ProcessContext},
 };
@@ -133,14 +134,41 @@ fn _main() -> Result<()> {
     }
 
     let cmd = command.display().to_string();
-    std::process::Command::new(command)
-        .args(arguments)
-        .env_clear()
-        .env("HOME", OsStr::from_bytes(home.as_ref().to_bytes()))
-        .env(
+    let mut proc = std::process::Command::new(command);
+    proc.args(arguments);
+
+    let keepenv = match_res.keepenv().unwrap_or(false);
+    if !keepenv {
+        proc.env_clear();
+        proc.env(
             "PATH",
             OsStr::from_bytes(b"/usr/local/sbin:/usr/local/bin:/usr/bin".as_slice()),
-        )
+        );
+    }
+
+    if let Some(envs) = match_res.setenv() {
+        for env in envs {
+            match env {
+                Env::Unset(ref name) if keepenv => {
+                    proc.env_remove(&***name);
+                }
+                Env::Copy(ref name) if !keepenv => {
+                    if let Ok(value) = std::env::var(&***name) {
+                        proc.env(&***name, value);
+                    }
+                }
+                Env::Set(ref name, ref template) => {
+                    let value = template.format();
+                    if !value.is_empty() {
+                        proc.env(&***name, value);
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    proc.env("HOME", OsStr::from_bytes(home.as_ref().to_bytes()))
         .env("SUDO_COMMAND", cmd)
         .env(
             "SUDO_USER",
@@ -149,6 +177,7 @@ fn _main() -> Result<()> {
         .env("SUDO_UID", ctx.original_user().id().to_string())
         .env("SUDO_GID", ctx.original_group().id().to_string())
         .exec();
+
     Ok(())
 }
 

@@ -1,7 +1,7 @@
 mod parser;
 
 pub use globset::GlobSet;
-pub use parser::{Origin, Rule, Target};
+pub use parser::{Env, Origin, Rule, Target};
 
 pub struct Rules(Vec<parser::Rule>);
 

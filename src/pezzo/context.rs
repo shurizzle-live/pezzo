@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use pezzo::{
-    conf::{Origin, Target},
+    conf::{Env, Origin, Target},
     unix::{Group, IAMContext, ProcessContext, User},
 };
 
@@ -15,6 +15,8 @@ use pezzo::{
 pub struct MatchResult {
     timeout: Option<u64>,
     askpass: Option<bool>,
+    keepenv: Option<bool>,
+    setenv: Option<Box<[Env]>>,
 }
 
 impl MatchResult {
@@ -26,6 +28,16 @@ impl MatchResult {
     #[inline]
     pub fn askpass(&self) -> Option<bool> {
         self.askpass
+    }
+
+    #[inline]
+    pub fn keepenv(&self) -> Option<bool> {
+        self.keepenv
+    }
+
+    #[inline]
+    pub fn setenv(&self) -> Option<&[Env]> {
+        self.setenv.as_ref().map(|e| e.as_ref())
     }
 }
 
@@ -219,6 +231,8 @@ impl MatchContext {
                 last = Some(MatchResult {
                     timeout: rule.timeout,
                     askpass: rule.askpass,
+                    keepenv: rule.keepenv,
+                    setenv: rule.setenv.clone(),
                 });
             }
         }

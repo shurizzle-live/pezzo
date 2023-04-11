@@ -1,5 +1,8 @@
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
-use std::ffi::CString;
+use std::{
+    ffi::{CString, OsStr, OsString},
+    rc::Rc,
+};
 
 #[derive(Debug, Clone)]
 pub enum Origin {
@@ -13,12 +16,51 @@ pub enum Target {
     UserGroup(Vec<CString>, Vec<CString>),
 }
 
+#[derive(Debug, Clone)]
+pub enum EnvTemplatePart {
+    Var(Box<OsStr>),
+    Str(Box<OsStr>),
+}
+
+#[derive(Debug, Clone)]
+pub struct EnvTemplate(Rc<Box<[EnvTemplatePart]>>);
+
+impl EnvTemplate {
+    pub fn format(&self) -> Box<OsStr> {
+        let mut buf = OsString::new();
+
+        for p in &**self.0 {
+            match p {
+                EnvTemplatePart::Var(ref name) => {
+                    if let Ok(txt) = std::env::var(name) {
+                        buf.push(txt);
+                    }
+                }
+                EnvTemplatePart::Str(ref txt) => {
+                    buf.push(txt);
+                }
+            }
+        }
+
+        buf.into_boxed_os_str()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Env {
+    Unset(Rc<Box<OsStr>>),
+    Copy(Rc<Box<OsStr>>),
+    Set(Rc<Box<OsStr>>, EnvTemplate),
+}
+
 struct Builder {
     origin: Option<Vec<Origin>>,
     target: Option<Vec<Target>>,
     exe: Option<GlobSet>,
     timeout: Option<u64>,
     askpass: Option<bool>,
+    keepenv: Option<bool>,
+    setenv: Option<Box<[Env]>>,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +70,8 @@ pub struct Rule {
     pub timeout: Option<u64>,
     pub askpass: Option<bool>,
     pub exe: Option<GlobSet>,
+    pub keepenv: Option<bool>,
+    pub setenv: Option<Box<[Env]>>,
 }
 
 impl From<Vec<Origin>> for Builder {
@@ -39,6 +83,8 @@ impl From<Vec<Origin>> for Builder {
             exe: None,
             timeout: None,
             askpass: None,
+            keepenv: None,
+            setenv: None,
         }
     }
 }
@@ -52,6 +98,8 @@ impl From<Vec<Target>> for Builder {
             exe: None,
             timeout: None,
             askpass: None,
+            keepenv: None,
+            setenv: None,
         }
     }
 }
@@ -65,6 +113,23 @@ impl From<GlobSet> for Builder {
             exe: Some(exe),
             timeout: None,
             askpass: None,
+            keepenv: None,
+            setenv: None,
+        }
+    }
+}
+
+impl From<Box<[Env]>> for Builder {
+    #[inline]
+    fn from(value: Box<[Env]>) -> Self {
+        Self {
+            origin: None,
+            target: None,
+            exe: None,
+            timeout: None,
+            askpass: None,
+            keepenv: None,
+            setenv: Some(value),
         }
     }
 }
@@ -78,6 +143,8 @@ impl Builder {
             exe,
             timeout,
             askpass,
+            keepenv,
+            setenv,
         }: Self,
     ) -> Result<(), &'static str> {
         if let Some(origin) = origin {
@@ -110,6 +177,18 @@ impl Builder {
             }
             self.askpass = Some(askpass);
         }
+        if let Some(keepenv) = keepenv {
+            if self.keepenv.is_some() {
+                return Err("askpass has already been defined");
+            }
+            self.keepenv = Some(keepenv);
+        }
+        if let Some(setenv) = setenv {
+            if self.setenv.is_some() {
+                return Err("askpass has already been defined");
+            }
+            self.setenv = Some(setenv);
+        }
         Ok(())
     }
 
@@ -122,6 +201,8 @@ impl Builder {
                 timeout: self.timeout,
                 askpass: self.askpass,
                 exe: self.exe,
+                keepenv: self.keepenv,
+                setenv: self.setenv,
             })
         } else {
             Err("origin not defined in rule")
@@ -136,6 +217,8 @@ impl Builder {
             exe: None,
             askpass: None,
             timeout: Some(timeout),
+            keepenv: None,
+            setenv: None,
         }
     }
 
@@ -147,6 +230,21 @@ impl Builder {
             exe: None,
             timeout: None,
             askpass: Some(ask),
+            keepenv: None,
+            setenv: None,
+        }
+    }
+
+    #[inline]
+    pub fn with_keepenv(keepenv: bool) -> Self {
+        Self {
+            origin: None,
+            target: None,
+            exe: None,
+            timeout: None,
+            askpass: None,
+            keepenv: Some(keepenv),
+            setenv: None,
         }
     }
 }
@@ -192,6 +290,8 @@ peg::parser! {
             / e:exe_statement() { e }
             / t:timeout_statement() { t }
             / a:askpass_statement() { a }
+            / k:keepenv_statement() { k }
+            / e:setenv_statement() { e }
 
         rule origin_statement() -> Builder
             = "origin" _ "=" _ o:origin_exp() _ ";" { o.into() }
@@ -207,6 +307,60 @@ peg::parser! {
 
         rule askpass_statement() -> Builder
             = "askpass" _ "=" _ b:bool_literal() _ ";" { Builder::with_askpass(b) }
+
+        rule keepenv_statement() -> Builder
+            = "keepenv" _ "=" _ b:bool_literal() _ ";" { Builder::with_keepenv(b) }
+
+        rule setenv_statement() -> Builder
+            = "setenv" _ "=" _ "{" _ e:env_expr() _ [b',']? _ "}" _ ";" { e.into() }
+
+        rule var_name_() -> OsString
+            = name:$([b'A'..=b'Z' | b'a'..=b'z' | b'_'][b'A'..=b'Z' | b'a'..=b'z' | b'_' | b'0'..=b'9']*) {
+                OsString::from(unsafe { std::str::from_utf8_unchecked(name) }.to_string())
+            }
+        rule var_name() -> Rc<Box<OsStr>>
+            = name:var_name_() { Rc::new(name.into_boxed_os_str()) }
+
+        rule env_unset() -> Env
+            = "-" n:var_name() { Env::Unset(n) }
+
+        rule env_copy() -> Env
+            = n:var_name() { Env::Copy(n) }
+
+        rule env_set() -> Env
+            = n:var_name() "=\"" t:var_template() [b'"'] { Env::Set(n, t) }
+
+        rule var_template() -> EnvTemplate
+            = p:var_template_part()* { EnvTemplate(Rc::new(p.into_boxed_slice())) }
+
+        rule var_template_part_str_char() -> u8
+            = [b'\\'] c:[b'$' | b'"'] { c }
+            / c:[^ b'\0' | b'$' | b'"'] { c }
+
+        rule var_template_part() -> EnvTemplatePart
+            = [b'$'] n:var_name_() { EnvTemplatePart::Var(n.into_boxed_os_str()) }
+            / "${" n:var_name_() [b'}'] { EnvTemplatePart::Var(n.into_boxed_os_str()) }
+            / s:var_template_part_str_char()+ {?
+                Ok(EnvTemplatePart::Str(OsString::from(String::from_utf8(s).map_err(|_| "invalid utf8")?).into_boxed_os_str()))
+            }
+
+        rule env() -> Env
+            = e:env_unset() { e }
+            / e:env_set() { e }
+            / e:env_copy() { e }
+
+        rule env_expr_cont() -> Env
+            = "," _ e:env() _ { e }
+
+        rule env_expr() -> Box<[Env]>
+            = lh:env() _ rh:env_expr_cont()* {
+                let mut rh = rh;
+                rh.insert(0, lh);
+                rh.into_boxed_slice()
+            }
+            / lh:env() {
+                vec![lh].into_boxed_slice()
+            }
 
         rule bool_literal() -> bool
             = "true" { true }
