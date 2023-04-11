@@ -137,13 +137,19 @@ fn _main() -> Result<()> {
     let mut proc = std::process::Command::new(command);
     proc.args(arguments);
 
-    let keepenv = match_res.keepenv().unwrap_or(false);
-    if !keepenv {
-        proc.env_clear();
+    fn set_default_path(proc: &mut std::process::Command) -> &mut std::process::Command {
         proc.env(
             "PATH",
             OsStr::from_bytes(b"/usr/local/sbin:/usr/local/bin:/usr/bin".as_slice()),
-        );
+        )
+    }
+
+    let keepenv = match_res.keepenv().unwrap_or(false);
+    if !keepenv {
+        proc.env_clear();
+        set_default_path(&mut proc);
+    } else if matches!(std::env::var_os("PATH"), None) {
+        set_default_path(&mut proc);
     }
 
     if let Some(envs) = match_res.setenv() {
