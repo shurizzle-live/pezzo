@@ -6,15 +6,18 @@ use util::*;
 
 use std::{
     ffi::{CStr, OsStr, OsString},
+    io::Write,
     os::unix::{prelude::OsStrExt, process::CommandExt},
+    sync::{Arc, Mutex},
 };
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use pezzo::{
     conf::Env,
-    database::Database,
-    unix::{IAMContext, ProcessContext},
+    database::{Database, Entry},
+    unix::{tty::TtyOut, IAMContext, ProcessContext},
+    DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, DEFAULT_SESSION_TIMEOUT, PEZZO_PAM_SERVICE_NAME,
 };
 
 extern crate pezzo;
@@ -22,13 +25,13 @@ extern crate pezzo;
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    // #[arg(
-    //     short = 'v',
-    //     long,
-    //     exclusive(true),
-    //     help("update user's timestamp without running a command")
-    // )]
-    // pub validate: bool,
+    #[arg(
+        short = 'v',
+        long,
+        exclusive(true),
+        help("update user's timestamp without running a command")
+    )]
+    pub validate: bool,
     #[arg(
         short = 'K',
         long,
@@ -57,6 +60,7 @@ fn _main() -> Result<()> {
     check_file_permissions(&proc.exe)?;
 
     let Cli {
+        validate,
         remove_timestamp,
         reset_timestamp,
         user,
@@ -77,6 +81,44 @@ fn _main() -> Result<()> {
         let mut db = Database::new(proc.original_user.name()).context("Cannot open database")?;
         db.retain(|e| e.session_id() != proc.sid && e.tty() != proc.ttyno);
         db.save().context("Cannot save database")?;
+        return Ok(());
+    }
+
+    if validate {
+        iam.escalate_permissions()
+            .context("Cannot set root permissions")?;
+
+        if is_expired(
+            proc.original_user.name(),
+            proc.sid,
+            proc.ttyno,
+            DEFAULT_SESSION_TIMEOUT,
+        )? {
+            let tty_info =
+                pezzo::unix::TtyInfo::for_ttyno(proc.ttyno).context("Cannot get a valid tty")?;
+
+            let out = Arc::new(Mutex::new(
+                tty_info.open_out().context("Cannot get a valid tty")?,
+            ));
+
+            let mut auth = pezzo::unix::pam::Authenticator::new(
+                PEZZO_PAM_SERVICE_NAME,
+                Some(proc.original_user.name()),
+                pezzo::unix::pam::PezzoConversation::from_values(
+                    DEFAULT_PROMPT_TIMEOUT,
+                    Arc::new(Mutex::new(
+                        tty_info.open_in().context("Cannot get a valid tty")?,
+                    )),
+                    out.clone(),
+                    proc.original_user.name(),
+                ),
+            )
+            .context("Cannot instantiate PAM authenticator")?;
+
+            autenticate(&mut auth, DEFAULT_MAX_RETRIES, out);
+        }
+
+        update_db(proc.original_user.name(), proc.sid, proc.ttyno)?;
         return Ok(());
     }
 
@@ -104,9 +146,22 @@ fn _main() -> Result<()> {
         )
     };
 
-    if match_res.askpass().unwrap_or(true) {
-        ctx.authenticate(match_res.timeout().unwrap_or(600));
+    if match_res.askpass().unwrap_or(true)
+        && is_expired(
+            ctx.original_user().name(),
+            ctx.sid(),
+            ctx.ttyno(),
+            match_res.timeout().unwrap_or(DEFAULT_SESSION_TIMEOUT),
+        )?
+    {
+        let mut auth = ctx
+            .authenticator()
+            .context("Cannot instantiate PAM authenticator")?;
+
+        autenticate(&mut auth, ctx.max_retries(), ctx.tty_out());
     }
+
+    update_db(ctx.original_user().name(), ctx.sid(), ctx.ttyno())?;
 
     ctx.escalate_permissions()
         .context("Cannot set root permissions")?;
@@ -193,4 +248,56 @@ fn main() {
         eprintln!("{:?}", err);
         std::process::exit(1);
     }
+}
+
+fn update_db(user_name: &CStr, sid: u32, ttyno: u32) -> Result<()> {
+    let mut db = Database::new(user_name).context("Failed to open database")?;
+    db.retain(|e| e.session_id() != sid && e.tty() != ttyno);
+    db.push(Entry {
+        session_id: sid,
+        tty: ttyno,
+        last_login: pezzo::unix::time::now(),
+    });
+    db.save().context("Unable to write database")
+}
+
+fn is_expired(user_name: &CStr, sid: u32, ttyno: u32, timeout: u64) -> Result<bool> {
+    let db = Database::new(user_name).context("Failed to open database")?;
+    if let Some(entry) = db
+        .iter()
+        .find(|&e| e.session_id() == sid && e.tty() == ttyno)
+    {
+        let time = pezzo::unix::time::now();
+        if (entry.last_login()..=(entry.last_login() + timeout)).contains(&time) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn autenticate(
+    auth: &mut pezzo::unix::pam::Authenticator<pezzo::unix::pam::PezzoConversation>,
+    max_retries: usize,
+    out: Arc<Mutex<TtyOut>>,
+) {
+    for i in 1..=max_retries {
+        if matches!(auth.authenticate(), Ok(_)) {
+            return;
+        }
+
+        if auth.get_conv().is_timedout() {
+            break;
+        }
+
+        {
+            let mut out = out.lock().expect("tty is poisoned");
+            if i == max_retries {
+                _ = writeln!(out, "pezzo: {} incorrect password attempts", i);
+            } else {
+                _ = writeln!(out, "Sorry, try again.");
+            }
+            _ = out.flush();
+        }
+    }
+    std::process::exit(1);
 }

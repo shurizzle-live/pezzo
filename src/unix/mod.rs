@@ -1,6 +1,6 @@
 mod common;
 mod iam;
-mod pam;
+pub mod pam;
 pub mod tty;
 #[cfg(target_os = "linux")]
 #[macro_use]
@@ -10,7 +10,7 @@ pub mod linux;
 pub mod bsd;
 use std::{
     ffi::CStr,
-    io::{self, Write},
+    io,
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -26,7 +26,7 @@ pub use iam::IAMContext;
 pub use process::*;
 pub use tty::TtyInfo;
 
-use crate::database::{Database, Entry};
+use crate::{DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_PAM_SERVICE_NAME};
 
 use self::tty::{TtyIn, TtyOut};
 
@@ -150,73 +150,21 @@ impl Context {
 
     #[inline]
     pub fn prompt_timeout(&self) -> libc::time_t {
-        30
+        DEFAULT_PROMPT_TIMEOUT
     }
 
     #[inline]
     pub fn max_retries(&self) -> usize {
-        3
+        DEFAULT_MAX_RETRIES
     }
 
     #[inline]
     pub fn authenticator(&self) -> pam::Result<pam::Authenticator<pam::PezzoConversation>> {
-        const SERVICE_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"pezzo\0") };
-
         pam::Authenticator::new(
-            SERVICE_NAME,
+            PEZZO_PAM_SERVICE_NAME,
             Some(self.original_user().name()),
             pam::PezzoConversation::new(self),
         )
-    }
-
-    // TODO: implement proper error handling
-    pub fn authenticate(&self, timeout: u64) {
-        let out = self.tty_out();
-
-        {
-            let db = Database::new(self.original_user().name()).unwrap();
-            if let Some(entry) = db
-                .iter()
-                .find(|&e| e.session_id() == self.proc_ctx.sid && e.tty() == self.ttyno())
-            {
-                let time = time::now();
-                if (entry.last_login()..=(entry.last_login() + timeout)).contains(&time) {
-                    return;
-                }
-            }
-        }
-
-        let mut auth = self.authenticator().unwrap();
-
-        for i in 1..=self.max_retries() {
-            if matches!(auth.authenticate(), Ok(_)) {
-                let mut db = Database::new(self.original_user().name()).unwrap();
-                db.retain(|e| e.session_id() != self.proc_ctx.sid && e.tty() != self.ttyno());
-                db.push(Entry {
-                    session_id: self.proc_ctx.sid,
-                    tty: self.ttyno(),
-                    last_login: time::now(),
-                });
-                db.save().unwrap();
-
-                return;
-            }
-
-            if auth.get_conv().is_timedout() {
-                break;
-            }
-
-            {
-                let mut out = out.lock().expect("tty is poisoned");
-                if i == self.max_retries() {
-                    _ = writeln!(out, "pezzo: {} incorrect password attempts", i);
-                } else {
-                    _ = writeln!(out, "Sorry, try again.");
-                }
-                _ = out.flush();
-            }
-        }
-        std::process::exit(1);
     }
 
     #[inline]

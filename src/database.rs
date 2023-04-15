@@ -1,5 +1,6 @@
 use std::{
     ffi::{CString, OsStr},
+    fmt,
     fs::{DirBuilder, File, OpenOptions},
     io::{self, Read, Seek, SeekFrom, Write},
     mem,
@@ -68,6 +69,16 @@ impl BorrowedEntry {
         unsafe {
             (*self.inner_mut()).last_login = value;
         }
+    }
+}
+
+impl fmt::Debug for BorrowedEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Entry")
+            .field("session_id", &self.session_id())
+            .field("tty", &self.tty())
+            .field("last_login", &self.last_login())
+            .finish()
     }
 }
 

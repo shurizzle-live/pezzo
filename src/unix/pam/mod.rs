@@ -4,6 +4,7 @@ mod sys;
 
 use std::{
     ffi::CStr,
+    fmt,
     io::{self, Write},
     marker::PhantomData,
     mem::{self, MaybeUninit},
@@ -32,6 +33,14 @@ pub enum Error {
     PermissionDenied,
     AuthorizationToken,
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for Error {}
 
 impl From<libc::c_int> for Error {
     fn from(raw: libc::c_int) -> Self {
@@ -303,13 +312,29 @@ pub struct PezzoConversation<'a> {
 }
 
 impl<'a> PezzoConversation<'a> {
+    #[inline]
     pub fn new(ctx: &'a super::Context) -> Self {
+        Self::from_values(
+            ctx.prompt_timeout(),
+            ctx.tty_in(),
+            ctx.tty_out(),
+            ctx.original_user().name(),
+        )
+    }
+
+    #[inline]
+    pub fn from_values(
+        timeout: libc::time_t,
+        tty_in: Arc<Mutex<TtyIn>>,
+        tty_out: Arc<Mutex<TtyOut>>,
+        name: &'a CStr,
+    ) -> Self {
         Self {
-            timeout: ctx.prompt_timeout(),
+            timeout,
             timedout: false,
-            tty_in: ctx.tty_in(),
-            tty_out: ctx.tty_out(),
-            name: ctx.original_user().name(),
+            tty_in,
+            tty_out,
+            name,
         }
     }
 
