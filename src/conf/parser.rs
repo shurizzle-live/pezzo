@@ -334,7 +334,7 @@ peg::parser! {
             = p:var_template_part()* { EnvTemplate(Rc::new(p.into_boxed_slice())) }
 
         rule var_template_part_str_char() -> u8
-            = [b'\\'] c:[b'$' | b'"'] { c }
+            = [b'\\'] c:[b'$' | b'"' | b'\\'] { c }
             / c:[^ b'\0' | b'$' | b'"'] { c }
 
         rule var_template_part() -> EnvTemplatePart
@@ -375,7 +375,7 @@ peg::parser! {
             }
 
         rule exe_char() -> u8
-            = [b'\\'] c:[b' ' | b'|' | b';' | b':'] { c }
+            = [b'\\'] c:[b' ' | b'|' | b';' | b':' | b'\\'] { c }
             / c:[^ b'\0' | b' ' | b'|' | b';' | b':'] { c }
 
         rule exe() -> Glob
