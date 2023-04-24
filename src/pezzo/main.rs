@@ -17,7 +17,7 @@ use pezzo::{
     conf::Env,
     database::{Database, Entry},
     unix::{tty::TtyOut, IAMContext, ProcessContext},
-    DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, DEFAULT_SESSION_TIMEOUT, PEZZO_PAM_SERVICE_NAME,
+    DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, DEFAULT_SESSION_TIMEOUT, PEZZO_NAME_CSTR,
 };
 
 extern crate pezzo;
@@ -102,7 +102,7 @@ fn _main() -> Result<()> {
             ));
 
             let mut auth = pezzo::unix::pam::Authenticator::new(
-                PEZZO_PAM_SERVICE_NAME,
+                PEZZO_NAME_CSTR,
                 Some(proc.original_user.name()),
                 pezzo::unix::pam::PezzoConversation::from_values(
                     DEFAULT_PROMPT_TIMEOUT,

@@ -26,7 +26,7 @@ pub use iam::IAMContext;
 pub use process::*;
 pub use tty::TtyInfo;
 
-use crate::{DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_PAM_SERVICE_NAME};
+use crate::{DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_NAME_CSTR};
 
 use self::tty::{TtyIn, TtyOut};
 
@@ -161,7 +161,7 @@ impl Context {
     #[inline]
     pub fn authenticator(&self) -> pam::Result<pam::Authenticator<pam::PezzoConversation>> {
         pam::Authenticator::new(
-            PEZZO_PAM_SERVICE_NAME,
+            PEZZO_NAME_CSTR,
             Some(self.original_user().name()),
             pam::PezzoConversation::new(self),
         )
