@@ -1,9 +1,11 @@
 use std::{mem, ptr, slice::SliceIndex};
 
+mod hostname;
 mod noecho;
 mod nonblock;
 mod uname;
 
+pub use hostname::hostname;
 pub use noecho::noecho;
 pub use nonblock::nonblock;
 pub use uname::uname;

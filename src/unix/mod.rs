@@ -22,6 +22,7 @@ pub use bsd::*;
 #[cfg(target_os = "linux")]
 pub use linux::*;
 
+pub use common::hostname;
 pub use iam::IAMContext;
 pub use process::*;
 pub use tty::TtyInfo;
