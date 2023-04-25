@@ -18,25 +18,86 @@ use super::{
     tty::{TtyIn, TtyOut},
 };
 
+#[repr(u32)]
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
-    Abort,
-    Buffer,
+    Open,
+    Symbol,
+    Service,
     System,
-    Authorization,
-    CredentialInsufficient,
-    InfoUnavailable,
-    MaxTries,
-    UserUnknown,
-    AccountExpired,
-    NewAuthTokenRequired,
+    Buffer,
     PermissionDenied,
+    Authorization,
+    CredentialsInsufficient,
+    AuthInfoUnavailable,
+    UserUnknown,
+    MaxTries,
+    NewAuthTokenRequired,
+    AccountExpired,
+    Session,
+    CredentialsUnavailable,
+    CredentialsExpired,
+    Credentials,
+    NoModuleData,
+    Conversation,
     AuthorizationToken,
+    AuthorizationTokenRecover,
+    AuthorizationTokenLock,
+    AuthorizationTokenDisableAging,
+    TryAgain,
+    Ignore,
+    Abort,
+    AuthorizationTokenExpired,
+    ModuleUnknown,
+    BadItem,
+    ConversationAgain,
+    Incomplete,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        let error_str = match self {
+            Self::Open => "Failed to load module",
+            Self::Symbol => "Symbol not found",
+            Self::Service => "Error in service module",
+            Self::System => "System error",
+            Self::Buffer => "Memory buffer error",
+            Self::PermissionDenied => "Permission denied",
+            Self::Authorization => "Authentication failure",
+            Self::CredentialsInsufficient => {
+                "Insufficient credentials to access authentication data"
+            }
+            Self::AuthInfoUnavailable => {
+                "Authentication service cannot retrieve authentication info"
+            }
+            Self::UserUnknown => "User not known to the underlying authentication module",
+            Self::MaxTries => "Have exhausted maximum number of retries for service",
+            Self::NewAuthTokenRequired => {
+                "Authentication token is no longer valid; new one required"
+            }
+            Self::AccountExpired => "User account has expired",
+            Self::Session => "Cannot make/remove an entry for the specified session",
+            Self::CredentialsUnavailable => {
+                "Authentication service cannot retrieve user credentials"
+            }
+            Self::CredentialsExpired => "User credentials expired",
+            Self::Credentials => "Failure setting user credentials",
+            Self::NoModuleData => "No module specific data is present",
+            Self::Conversation => "Conversation error",
+            Self::AuthorizationToken => "Authentication token manipulation error",
+            Self::AuthorizationTokenRecover => "Authentication information cannot be recovered",
+            Self::AuthorizationTokenLock => "Authentication token lock busy",
+            Self::AuthorizationTokenDisableAging => "Authentication token aging disabled",
+            Self::TryAgain => "Failed preliminary check by password service",
+            Self::Ignore => "The return value should be ignored by PAM dispatch",
+            Self::Abort => "Critical error - immediate abort",
+            Self::AuthorizationTokenExpired => "Authentication token expired",
+            Self::ModuleUnknown => "Module is unknown",
+            Self::BadItem => "Bad item passed to pam_*_item()",
+            Self::ConversationAgain => "Conversation is waiting for event",
+            Self::Incomplete => "Application needs to call libpam again",
+        };
+        fmt::Display::fmt(error_str, f)
     }
 }
 
@@ -45,18 +106,37 @@ impl std::error::Error for Error {}
 impl From<libc::c_int> for Error {
     fn from(raw: libc::c_int) -> Self {
         match raw {
-            sys::PAM_ABORT => Self::Abort,
-            sys::PAM_BUF_ERR => Self::Buffer,
+            sys::PAM_OPEN_ERR => Self::Open,
+            sys::PAM_SYMBOL_ERR => Self::Symbol,
+            sys::PAM_SERVICE_ERR => Self::Service,
             sys::PAM_SYSTEM_ERR => Self::System,
-            sys::PAM_AUTH_ERR => Self::Authorization,
-            sys::PAM_CRED_INSUFFICIENT => Self::CredentialInsufficient,
-            sys::PAM_AUTHINFO_UNAVAIL => Self::InfoUnavailable,
-            sys::PAM_MAXTRIES => Self::MaxTries,
-            sys::PAM_USER_UNKNOWN => Self::UserUnknown,
-            sys::PAM_ACCT_EXPIRED => Self::AccountExpired,
-            sys::PAM_NEW_AUTHTOK_REQD => Self::NewAuthTokenRequired,
+            sys::PAM_BUF_ERR => Self::Buffer,
             sys::PAM_PERM_DENIED => Self::PermissionDenied,
+            sys::PAM_AUTH_ERR => Self::Authorization,
+            sys::PAM_CRED_INSUFFICIENT => Self::CredentialsInsufficient,
+            sys::PAM_AUTHINFO_UNAVAIL => Self::AuthInfoUnavailable,
+            sys::PAM_USER_UNKNOWN => Self::UserUnknown,
+            sys::PAM_MAXTRIES => Self::MaxTries,
+            sys::PAM_NEW_AUTHTOK_REQD => Self::NewAuthTokenRequired,
+            sys::PAM_ACCT_EXPIRED => Self::AccountExpired,
+            sys::PAM_SESSION_ERR => Self::Session,
+            sys::PAM_CRED_UNAVAIL => Self::CredentialsUnavailable,
+            sys::PAM_CRED_EXPIRED => Self::CredentialsExpired,
+            sys::PAM_CRED_ERR => Self::Credentials,
+            sys::PAM_NO_MODULE_DATA => Self::NoModuleData,
+            sys::PAM_CONV_ERR => Self::Conversation,
             sys::PAM_AUTHTOK_ERR => Self::AuthorizationToken,
+            sys::PAM_AUTHTOK_RECOVER_ERR => Self::AuthorizationTokenRecover,
+            sys::PAM_AUTHTOK_LOCK_BUSY => Self::AuthorizationTokenLock,
+            sys::PAM_AUTHTOK_DISABLE_AGING => Self::AuthorizationTokenDisableAging,
+            sys::PAM_TRY_AGAIN => Self::TryAgain,
+            sys::PAM_IGNORE => Self::Ignore,
+            sys::PAM_ABORT => Self::Abort,
+            sys::PAM_AUTHTOK_EXPIRED => Self::AuthorizationTokenExpired,
+            sys::PAM_MODULE_UNKNOWN => Self::ModuleUnknown,
+            sys::PAM_BAD_ITEM => Self::BadItem,
+            sys::PAM_CONV_AGAIN => Self::ConversationAgain,
+            sys::PAM_INCOMPLETE => Self::Incomplete,
             x => unreachable!("unknown error {}", x),
         }
     }
@@ -66,18 +146,37 @@ impl From<libc::c_int> for Error {
 impl Into<libc::c_int> for Error {
     fn into(self) -> libc::c_int {
         match self {
-            Self::Abort => sys::PAM_ABORT,
-            Self::Buffer => sys::PAM_BUF_ERR,
+            Self::Open => sys::PAM_OPEN_ERR,
+            Self::Symbol => sys::PAM_SYMBOL_ERR,
+            Self::Service => sys::PAM_SERVICE_ERR,
             Self::System => sys::PAM_SYSTEM_ERR,
-            Self::Authorization => sys::PAM_AUTH_ERR,
-            Self::CredentialInsufficient => sys::PAM_CRED_INSUFFICIENT,
-            Self::InfoUnavailable => sys::PAM_AUTHINFO_UNAVAIL,
-            Self::MaxTries => sys::PAM_MAXTRIES,
-            Self::UserUnknown => sys::PAM_USER_UNKNOWN,
-            Self::AccountExpired => sys::PAM_ACCT_EXPIRED,
-            Self::NewAuthTokenRequired => sys::PAM_NEW_AUTHTOK_REQD,
+            Self::Buffer => sys::PAM_BUF_ERR,
             Self::PermissionDenied => sys::PAM_PERM_DENIED,
+            Self::Authorization => sys::PAM_AUTH_ERR,
+            Self::CredentialsInsufficient => sys::PAM_CRED_INSUFFICIENT,
+            Self::AuthInfoUnavailable => sys::PAM_AUTHINFO_UNAVAIL,
+            Self::UserUnknown => sys::PAM_USER_UNKNOWN,
+            Self::MaxTries => sys::PAM_MAXTRIES,
+            Self::NewAuthTokenRequired => sys::PAM_NEW_AUTHTOK_REQD,
+            Self::AccountExpired => sys::PAM_ACCT_EXPIRED,
+            Self::Session => sys::PAM_SESSION_ERR,
+            Self::CredentialsUnavailable => sys::PAM_CRED_UNAVAIL,
+            Self::CredentialsExpired => sys::PAM_CRED_EXPIRED,
+            Self::Credentials => sys::PAM_CRED_ERR,
+            Self::NoModuleData => sys::PAM_NO_MODULE_DATA,
+            Self::Conversation => sys::PAM_CONV_ERR,
             Self::AuthorizationToken => sys::PAM_AUTHTOK_ERR,
+            Self::AuthorizationTokenRecover => sys::PAM_AUTHTOK_RECOVER_ERR,
+            Self::AuthorizationTokenLock => sys::PAM_AUTHTOK_LOCK_BUSY,
+            Self::AuthorizationTokenDisableAging => sys::PAM_AUTHTOK_DISABLE_AGING,
+            Self::TryAgain => sys::PAM_TRY_AGAIN,
+            Self::Ignore => sys::PAM_IGNORE,
+            Self::Abort => sys::PAM_ABORT,
+            Self::AuthorizationTokenExpired => sys::PAM_AUTHTOK_EXPIRED,
+            Self::ModuleUnknown => sys::PAM_MODULE_UNKNOWN,
+            Self::BadItem => sys::PAM_BAD_ITEM,
+            Self::ConversationAgain => sys::PAM_CONV_AGAIN,
+            Self::Incomplete => sys::PAM_INCOMPLETE,
         }
     }
 }
