@@ -1,5 +1,5 @@
-[target.aarch64-unknown-linux-gnu]
-image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+[target.x86_64-unknown-linux-gnu]
+dockerfile = "cross/x86_64.pam.Dockerfile"
 
-[build]
-dockerfile = "pam.Dockerfile"
+[target.aarch64-unknown-linux-gnu]
+dockerfile = "cross/aarch64.pam.Dockerfile"
