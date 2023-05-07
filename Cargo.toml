@@ -19,7 +19,7 @@ codegen-units = 1
 [features]
 
 [build-dependencies]
-bindgen = "0.64.0"
+bindgen = "0.65.1"
 
 [target.'cfg(unix)'.dependencies]
 memchr = "2.5.0"

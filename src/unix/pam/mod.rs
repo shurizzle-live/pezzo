@@ -230,7 +230,7 @@ unsafe extern "C" fn conversation_trampoline<C: Conversation>(
             match msg.msg_style {
                 sys::PAM_PROMPT_ECHO_OFF => match conv.prompt_noecho(CStr::from_ptr(msg.msg)) {
                     Ok(buf) => {
-                        resp.resp = buf.leak_c_string() as *mut i8;
+                        resp.resp = buf.leak_c_string().cast();
                         resp.resp_retcode = sys::PAM_SUCCESS;
                     }
                     Err(err) => {
@@ -240,7 +240,7 @@ unsafe extern "C" fn conversation_trampoline<C: Conversation>(
                 },
                 sys::PAM_PROMPT_ECHO_ON => match conv.prompt_noecho(CStr::from_ptr(msg.msg)) {
                     Ok(buf) => {
-                        resp.resp = buf.leak_c_string() as *mut i8;
+                        resp.resp = buf.leak_c_string().cast();
                         resp.resp_retcode = sys::PAM_SUCCESS;
                     }
                     Err(err) => {
@@ -467,11 +467,11 @@ impl<'a> PezzoConversation<'a> {
             unsafe {
                 libc::strcmp(
                     prompt.as_ptr(),
-                    dgettext(DOMAIN, "Password:".as_ptr() as *const i8),
+                    dgettext(DOMAIN, "Password:".as_ptr().cast()).cast(),
                 ) == 0
                     || libc::strcmp(
                         prompt.as_ptr(),
-                        dgettext(DOMAIN, "Password: ".as_ptr() as *const i8),
+                        dgettext(DOMAIN, "Password: ".as_ptr().cast()).cast(),
                     ) == 0
                     || base_prompt_is_password(prompt, name)
             }

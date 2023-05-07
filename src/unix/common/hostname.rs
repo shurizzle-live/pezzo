@@ -6,7 +6,7 @@ pub fn hostname() -> CString {
     unsafe {
         let mut buf = Vec::<u8>::with_capacity(1024);
         while {
-            let res = libc::gethostname(buf.as_mut_ptr() as *mut i8, buf.capacity());
+            let res = libc::gethostname(buf.as_mut_ptr().cast(), buf.capacity());
 
             if res == -1 {
                 if *__errno() == libc::ENAMETOOLONG {
