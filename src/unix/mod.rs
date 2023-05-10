@@ -60,6 +60,7 @@ pub struct Context {
     tty_out: Arc<Mutex<TtyOut>>,
     target_user: User,
     target_group: Group,
+    bell: bool,
 }
 
 impl Context {
@@ -68,6 +69,7 @@ impl Context {
         proc_ctx: ProcessContext,
         target_user: User,
         target_group: Group,
+        bell: bool,
     ) -> io::Result<Self> {
         let tty_ctx = TtyInfo::for_ttyno(proc_ctx.ttyno)?;
         let tty_in = Arc::new(Mutex::new(tty_ctx.open_in()?));
@@ -81,6 +83,7 @@ impl Context {
             tty_out,
             target_user,
             target_group,
+            bell,
         })
     }
 
@@ -157,6 +160,11 @@ impl Context {
     #[inline]
     pub fn max_retries(&self) -> usize {
         DEFAULT_MAX_RETRIES
+    }
+
+    #[inline]
+    pub fn bell(&self) -> bool {
+        self.bell
     }
 
     #[inline]

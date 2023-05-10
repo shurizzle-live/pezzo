@@ -408,6 +408,7 @@ pub struct PezzoConversation<'a> {
     timeout: libc::time_t,
     tty_in: Arc<Mutex<TtyIn>>,
     tty_out: Arc<Mutex<TtyOut>>,
+    bell: bool,
 }
 
 impl<'a> PezzoConversation<'a> {
@@ -418,6 +419,7 @@ impl<'a> PezzoConversation<'a> {
             ctx.tty_in(),
             ctx.tty_out(),
             ctx.original_user().name(),
+            ctx.bell(),
         )
     }
 
@@ -427,6 +429,7 @@ impl<'a> PezzoConversation<'a> {
         tty_in: Arc<Mutex<TtyIn>>,
         tty_out: Arc<Mutex<TtyOut>>,
         name: &'a CStr,
+        bell: bool,
     ) -> Self {
         Self {
             timeout,
@@ -434,6 +437,7 @@ impl<'a> PezzoConversation<'a> {
             tty_in,
             tty_out,
             name,
+            bell,
         }
     }
 
@@ -499,7 +503,12 @@ impl<'a> PezzoConversation<'a> {
                 }
             }
 
-            _ = out.flush();
+            if self.bell {
+                out.write_all(b"\x07")
+                    .map_err(|_| ConvError::Conversation)?;
+            }
+
+            out.flush().map_err(|_| ConvError::Conversation)?;
         }
 
         let timeout = self.prompt_timeout();
@@ -571,6 +580,10 @@ impl<'a> PezzoConversation<'a> {
         out.write_all(self.name.to_bytes())
             .map_err(|_| ConvError::Conversation)?;
         out.write_all(b": ").map_err(|_| ConvError::Conversation)?;
+        if self.bell {
+            out.write_all(b"\x07")
+                .map_err(|_| ConvError::Conversation)?;
+        }
         out.flush().map_err(|_| ConvError::Conversation)
     }
 

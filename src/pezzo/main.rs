@@ -41,6 +41,8 @@ pub struct Cli {
     pub remove_timestamp: bool,
     #[arg(short = 'k', long, exclusive(true), help("invalidate timestamp file"))]
     pub reset_timestamp: bool,
+    #[arg(short = 'B', long, help("ring bell when prompting"))]
+    pub bell: bool,
     #[arg(short, long, value_parser = parse_box_c_str, value_name = "USER", help("run command as specified user name or ID"))]
     pub user: Option<Box<CStr>>,
     #[arg(short, long, value_parser = parse_box_c_str, value_name = "GROUP", help("run command as the specified group name or ID"))]
@@ -63,6 +65,7 @@ fn _main() -> Result<()> {
         validate,
         remove_timestamp,
         reset_timestamp,
+        bell,
         user,
         group,
         command: args,
@@ -111,6 +114,7 @@ fn _main() -> Result<()> {
                     )),
                     out.clone(),
                     proc.original_user.name(),
+                    bell,
                 ),
             )
             .context("Cannot instantiate PAM authenticator")?;
@@ -138,7 +142,7 @@ fn _main() -> Result<()> {
 
     let (ctx, command, arguments, home) = {
         (
-            pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group)
+            pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group, bell)
                 .context("Cannot instantiate tty")?,
             ctx.command,
             ctx.arguments,
