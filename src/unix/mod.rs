@@ -153,7 +153,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn prompt_timeout(&self) -> libc::time_t {
+    pub fn prompt_timeout(&self) -> u32 {
         DEFAULT_PROMPT_TIMEOUT
     }
 

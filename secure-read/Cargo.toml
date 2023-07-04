@@ -1,0 +1,21 @@
+[package]
+name = "secure-read"
+version = "0.0.1"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = ["linux-syscalls/std", "unix-clock/std"]
+c = ["libc", "memchr", "linux-syscalls/libc-compat", "unix-clock/libc-compat"]
+
+[target.'cfg(unix)'.dependencies]
+unix-clock = { git = "https://github.com/shurizzle/unix-clock", default-features = false }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+libc = "0.2.144"
+memchr = "2.5.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+linux-syscalls = { version = "0.1.2", default-features = false }
+libc = { version = "0.2.144", optional = true }
+memchr = { version = "2.5.0", optional = true }

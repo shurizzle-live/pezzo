@@ -1,9 +1,6 @@
-use std::{
-    io::{self, BufRead},
-    os::fd::{AsRawFd, RawFd},
-};
+use crate::io;
 
-pub struct NonBlockHolder(RawFd, libc::c_int);
+pub struct NonBlockHolder(io::RawFd, core::ffi::c_int);
 
 impl Drop for NonBlockHolder {
     fn drop(&mut self) {
@@ -13,12 +10,13 @@ impl Drop for NonBlockHolder {
     }
 }
 
-pub fn nonblock<R: BufRead + AsRawFd>(reader: &mut R) -> io::Result<NonBlockHolder> {
+pub fn nonblock<R: io::BufRead + io::AsRawFd>(reader: &mut R) -> io::Result<NonBlockHolder> {
     let flags = unsafe {
-        let flags = libc::fcntl(reader.as_raw_fd(), libc::F_GETFL);
-        if flags == -1 {
+        let res = libc::fcntl(reader.as_raw_fd(), libc::F_GETFL);
+        if res == -1 {
             return Err(io::Error::last_os_error());
         }
+        let flags = res | libc::O_LARGEFILE;
 
         if flags & libc::O_NONBLOCK == 0 {
             if libc::fcntl(reader.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) == -1 {

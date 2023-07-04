@@ -13,10 +13,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::{
-    common::CBuffer,
-    tty::{TtyIn, TtyOut},
-};
+use super::tty::{TtyIn, TtyOut};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
@@ -286,9 +283,9 @@ pub type ConvResult<T> = std::result::Result<T, ConvError>;
 pub trait Conversation {
     fn preflight(&mut self) {}
 
-    fn prompt(&mut self, prompt: &CStr) -> ConvResult<CBuffer>;
+    fn prompt(&mut self, prompt: &CStr) -> ConvResult<secure_read::CBuffer>;
 
-    fn prompt_noecho(&mut self, prompt: &CStr) -> ConvResult<CBuffer>;
+    fn prompt_noecho(&mut self, prompt: &CStr) -> ConvResult<secure_read::CBuffer>;
 
     fn info(&mut self, prompt: &CStr) -> ConvResult<()>;
 
@@ -405,7 +402,7 @@ impl<'a> Iterator for LinesIterator<'a> {
 pub struct PezzoConversation<'a> {
     name: &'a CStr,
     timedout: bool,
-    timeout: libc::time_t,
+    timeout: u32,
     tty_in: Arc<Mutex<TtyIn>>,
     tty_out: Arc<Mutex<TtyOut>>,
     bell: bool,
@@ -425,7 +422,7 @@ impl<'a> PezzoConversation<'a> {
 
     #[inline]
     pub fn from_values(
-        timeout: libc::time_t,
+        timeout: u32,
         tty_in: Arc<Mutex<TtyIn>>,
         tty_out: Arc<Mutex<TtyOut>>,
         name: &'a CStr,
@@ -441,7 +438,7 @@ impl<'a> PezzoConversation<'a> {
         }
     }
 
-    fn _prompt(&mut self, prompt: &CStr, echo: bool) -> ConvResult<CBuffer> {
+    fn _prompt(&mut self, prompt: &CStr, echo: bool) -> ConvResult<secure_read::CBuffer> {
         fn base_prompt_is_password(prompt: &CStr, name: &CStr) -> bool {
             if let Some(rest) = prompt.to_bytes().strip_prefix(b"Password:") {
                 return rest.is_empty() || rest == b" ";
@@ -588,7 +585,7 @@ impl<'a> PezzoConversation<'a> {
     }
 
     #[inline]
-    pub fn prompt_timeout(&self) -> libc::time_t {
+    pub fn prompt_timeout(&self) -> u32 {
         self.timeout
     }
 
@@ -604,12 +601,12 @@ impl<'a> Conversation for PezzoConversation<'a> {
     }
 
     #[inline]
-    fn prompt(&mut self, prompt: &CStr) -> ConvResult<CBuffer> {
+    fn prompt(&mut self, prompt: &CStr) -> ConvResult<secure_read::CBuffer> {
         self._prompt(prompt, true)
     }
 
     #[inline]
-    fn prompt_noecho(&mut self, prompt: &CStr) -> ConvResult<CBuffer> {
+    fn prompt_noecho(&mut self, prompt: &CStr) -> ConvResult<secure_read::CBuffer> {
         self._prompt(prompt, false)
     }
 

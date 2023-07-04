@@ -2,14 +2,10 @@ use std::{
     fmt,
     fs::File,
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    mem::MaybeUninit,
     os::fd::{AsFd, AsRawFd, FromRawFd, IntoRawFd, RawFd},
     path::{Path, PathBuf},
-    ptr,
     sync::Arc,
 };
-
-use super::{__errno, common::CBuffer};
 
 pub struct TtyInfo {
     pub(crate) path: Arc<PathBuf>,
@@ -144,126 +140,14 @@ impl TtyIn {
         &self.name
     }
 
-    pub fn c_readline(&mut self, timeout: libc::time_t) -> io::Result<CBuffer> {
-        fn normalize_line(buf: &mut CBuffer) {
-            if let Some(last2) = buf
-                .len()
-                .checked_sub(2)
-                .map(|p| unsafe { buf.get_unchecked(p..) })
-            {
-                if last2 == b"\r\n" {
-                    buf.truncate(buf.len() - 1);
-                    unsafe { *buf.get_unchecked_mut(buf.len() - 1) = b'\n' };
-                } else if last2 == b"\n\r" {
-                    buf.truncate(buf.len() - 1);
-                }
-            } else if let Some(c) = buf.as_mut_slice().last_mut() {
-                if *c == b'\r' {
-                    *c = b'\n'
-                }
-            }
-
-            if let Some(i) = memchr::memrchr(b'\x15', buf.as_slice()) {
-                unsafe {
-                    let dst = buf.data;
-                    let src = buf.data.add(i + 1) as *const u8;
-                    let len = buf.len() - i - 1;
-                    std::ptr::copy(src, dst, len);
-                    std::slice::from_raw_parts_mut(buf.data.add(len), buf.len() - len).fill(0);
-                    buf.len = len;
-                }
-            }
-        }
-
-        let _holder = super::common::nonblock(self)?;
-        let mut buf = CBuffer::new();
-
-        let mut fds = unsafe {
-            let mut fds = MaybeUninit::<libc::fd_set>::uninit();
-            libc::FD_ZERO(fds.as_mut_ptr());
-            fds.assume_init()
-        };
-
-        unsafe {
-            loop {
-                let mut timeout_val = libc::timeval {
-                    tv_sec: timeout,
-                    tv_usec: 0,
-                };
-
-                libc::FD_SET(self.as_raw_fd(), &mut fds);
-
-                {
-                    let mut err;
-
-                    while {
-                        err = libc::select(
-                            self.as_raw_fd() + 1,
-                            &mut fds,
-                            ptr::null_mut(),
-                            ptr::null_mut(),
-                            &mut timeout_val,
-                        );
-                        err == -1 && *__errno() == libc::EINTR
-                    } {}
-
-                    if err == 0 {
-                        *__errno() = libc::ETIMEDOUT;
-                        return Err(io::Error::last_os_error());
-                    } else if err == -1 {
-                        return Err(io::Error::last_os_error());
-                    }
-                }
-
-                let mut first = true;
-                loop {
-                    if let Err(err) = self.inner.fill_buf() {
-                        match err {
-                            err if err.kind() == io::ErrorKind::Interrupted => continue,
-                            err if err.kind() == io::ErrorKind::WouldBlock => {
-                                if first {
-                                    break;
-                                }
-                            }
-                            err => return Err(err),
-                        }
-                    }
-                    first = !first;
-
-                    if self.inner.buffer().is_empty() {
-                        normalize_line(&mut buf);
-                        return Ok(buf);
-                    }
-
-                    if let Some(pos) = memchr::memchr2(b'\n', b'\0', self.inner.buffer()) {
-                        match self.inner.buffer().get_unchecked(pos) {
-                            b'\n' => {
-                                buf.push_slice(self.inner.buffer().get_unchecked(..(pos + 1)));
-                                self.inner.consume(pos + 1);
-                                normalize_line(&mut buf);
-                                return Ok(buf);
-                            }
-                            b'\0' => {
-                                return Err(io::Error::new(
-                                    io::ErrorKind::InvalidInput,
-                                    "line contains zeros",
-                                ))
-                            }
-                            _ => unreachable!(),
-                        }
-                    } else {
-                        let inner = self.inner.buffer();
-                        buf.push_slice(inner);
-                        self.inner.consume(inner.len());
-                    }
-                }
-            }
-        }
+    #[inline]
+    pub fn c_readline(&mut self, timeout: u32) -> io::Result<secure_read::CBuffer> {
+        secure_read::secure_read(self, secure_read::CBuffer::new(), timeout)
     }
 
-    pub fn c_readline_noecho(&mut self, timeout: libc::time_t) -> io::Result<CBuffer> {
-        let _holder = crate::unix::common::noecho(self)?;
-        self.c_readline(timeout)
+    #[inline]
+    pub fn c_readline_noecho(&mut self, timeout: u32) -> io::Result<secure_read::CBuffer> {
+        secure_read::secure_read_noecho(self, secure_read::CBuffer::new(), timeout)
     }
 }
 
@@ -402,7 +286,7 @@ impl Write for TtyOut {
 impl Drop for TtyIn {
     /// Consume input and zeroize the buffer
     fn drop(&mut self) {
-        let _holder = super::common::nonblock(self);
+        let _holder = secure_read::nonblock(self);
 
         let mut max_len = self.inner.buffer().len();
         self.inner.consume(max_len);
