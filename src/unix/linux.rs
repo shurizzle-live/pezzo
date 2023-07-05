@@ -5,7 +5,7 @@ macro_rules! prefix {
     };
 }
 
-use std::{io, ptr, sync::Arc};
+use std::{io, sync::Arc};
 
 use tty_info::ProcessInfo;
 
@@ -15,24 +15,6 @@ use super::{
 };
 
 pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId = unix_clock::raw::ClockId::Boottime;
-
-pub fn get_groups() -> io::Result<Vec<u32>> {
-    unsafe {
-        let len = libc::getgroups(0, ptr::null_mut());
-        if len == -1 {
-            return Err(io::Error::last_os_error());
-        }
-        let mut buf = Vec::with_capacity(len as usize);
-        let len = libc::getgroups(len, buf.as_mut_ptr());
-        if len == -1 {
-            return Err(io::Error::last_os_error());
-        }
-        buf.set_len(len as usize);
-        println!("{:?}", buf);
-
-        Ok(buf)
-    }
-}
 
 impl ProcessContext {
     pub fn current(iam: &IAMContext) -> io::Result<Self> {
