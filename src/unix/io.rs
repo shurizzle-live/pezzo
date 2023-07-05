@@ -98,6 +98,7 @@ pub struct OpenOptions {
     truncate: bool,
     create: bool,
     create_new: bool,
+    mode: u16,
 }
 
 #[allow(dead_code)]
@@ -110,6 +111,7 @@ impl OpenOptions {
             truncate: false,
             create: false,
             create_new: false,
+            mode: 0o666,
         }
     }
 
@@ -140,6 +142,11 @@ impl OpenOptions {
 
     pub fn create_new(&mut self, create_new: bool) -> &mut Self {
         self.create_new = create_new;
+        self
+    }
+
+    pub fn mode(&mut self, mode: u16) -> &mut Self {
+        self.mode = mode;
         self
     }
 
@@ -182,7 +189,7 @@ impl OpenOptions {
         let flags = O_CLOEXEC | self.get_access_mode()? | self.get_creation_mode()?;
         #[cfg(not(target_os = "linux"))]
         {
-            let fd = unsafe { libc::open(path.as_ptr(), flags as _) };
+            let fd = unsafe { libc::open(path.as_ptr(), flags as _, self.mode as _) };
             if fd == -1 {
                 Err(std::io::Error::last_os_error())
             } else {
@@ -192,7 +199,9 @@ impl OpenOptions {
         #[cfg(target_os = "linux")]
         {
             loop {
-                match unsafe { syscall!(Sysno::open, path.as_ptr(), flags).map(|fd| fd as RawFd) } {
+                match unsafe {
+                    syscall!(Sysno::open, path.as_ptr(), flags, self.mode).map(|fd| fd as RawFd)
+                } {
                     Err(Errno::EINTR) => (),
                     Err(err) => return Err(err.into()),
                     Ok(fd) => return Ok(unsafe { File::from_raw_fd(fd) }),
