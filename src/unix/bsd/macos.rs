@@ -1,35 +1,36 @@
 #![allow(dead_code, non_camel_case_types, unused_assignments)]
 
-mod sysctl;
+use std::{io, sync::Arc};
 
-use std::io;
+use super::{Group, IAMContext, User};
 
-use sysctl::kinfo_proc;
+pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId =
+    unix_clock::raw::ClockId::MonotonicRaw;
 
-use super::super::{Group, IAMContext, User};
+#[macro_export]
+macro_rules! prefix {
+    ($p:literal) => {
+        concat!("/usr/local", $p)
+    };
+}
 
-impl super::super::process::ProcessContext {
+impl super::ProcessContext {
     pub fn current(iam: &IAMContext) -> io::Result<Self> {
-        let exe = std::env::current_exe()?;
-        let pid = std::process::id();
-        let sid = unsafe { libc::getsid(pid as i32) as u32 };
+        let tty_info::ProcessInfo {
+            pid,
+            uid,
+            gid,
+            session,
+            tty,
+        } = tty_info::ProcessInfo::current()?;
 
-        let (uid, gid, ttyno) = {
-            let ki_proc = super::proc_info::<kinfo_proc>(
-                [
-                    libc::CTL_KERN,
-                    libc::KERN_PROC,
-                    libc::KERN_PROC_PID,
-                    pid as libc::c_int,
-                ]
-                .as_mut_slice(),
-            )?;
-
-            let uid = ki_proc.kp_eproc.e_pcred.p_ruid;
-            let gid = ki_proc.kp_eproc.e_pcred.p_rgid;
-            let ttyno = ki_proc.kp_eproc.e_tdev as u32;
-            (uid, gid, ttyno)
+        let tty = if let Some(tty) = tty {
+            tty
+        } else {
+            return Err(io::ErrorKind::NotFound.into());
         };
+
+        let exe = std::env::current_exe()?;
 
         let user_name = if let Some(user_name) = iam.user_name_by_id(uid)? {
             user_name
@@ -61,8 +62,8 @@ impl super::super::process::ProcessContext {
             original_user,
             original_group,
             original_groups,
-            sid,
-            ttyno,
+            sid: session,
+            tty: Arc::new(tty),
         })
     }
 }

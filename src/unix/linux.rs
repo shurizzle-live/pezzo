@@ -14,6 +14,8 @@ use super::{
     IAMContext, ProcessContext,
 };
 
+pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId = unix_clock::raw::ClockId::Bootime;
+
 pub fn get_groups() -> io::Result<Vec<u32>> {
     unsafe {
         let len = libc::getgroups(0, ptr::null_mut());

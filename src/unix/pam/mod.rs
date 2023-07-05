@@ -123,7 +123,7 @@ impl From<libc::c_int> for Error {
             sys::PAM_NO_MODULE_DATA => Self::NoModuleData,
             sys::PAM_CONV_ERR => Self::Conversation,
             sys::PAM_AUTHTOK_ERR => Self::AuthorizationToken,
-            sys::PAM_AUTHTOK_RECOVER_ERR => Self::AuthorizationTokenRecover,
+            // sys::PAM_AUTHTOK_RECOVER_ERR => Self::AuthorizationTokenRecover,
             sys::PAM_AUTHTOK_LOCK_BUSY => Self::AuthorizationTokenLock,
             sys::PAM_AUTHTOK_DISABLE_AGING => Self::AuthorizationTokenDisableAging,
             sys::PAM_TRY_AGAIN => Self::TryAgain,
@@ -131,9 +131,9 @@ impl From<libc::c_int> for Error {
             sys::PAM_ABORT => Self::Abort,
             sys::PAM_AUTHTOK_EXPIRED => Self::AuthorizationTokenExpired,
             sys::PAM_MODULE_UNKNOWN => Self::ModuleUnknown,
-            sys::PAM_BAD_ITEM => Self::BadItem,
-            sys::PAM_CONV_AGAIN => Self::ConversationAgain,
-            sys::PAM_INCOMPLETE => Self::Incomplete,
+            // sys::PAM_BAD_ITEM => Self::BadItem,
+            // sys::PAM_CONV_AGAIN => Self::ConversationAgain,
+            // sys::PAM_INCOMPLETE => Self::Incomplete,
             x => unreachable!("unknown error {}", x),
         }
     }
@@ -163,7 +163,7 @@ impl Into<libc::c_int> for Error {
             Self::NoModuleData => sys::PAM_NO_MODULE_DATA,
             Self::Conversation => sys::PAM_CONV_ERR,
             Self::AuthorizationToken => sys::PAM_AUTHTOK_ERR,
-            Self::AuthorizationTokenRecover => sys::PAM_AUTHTOK_RECOVER_ERR,
+            // Self::AuthorizationTokenRecover => sys::PAM_AUTHTOK_RECOVER_ERR,
             Self::AuthorizationTokenLock => sys::PAM_AUTHTOK_LOCK_BUSY,
             Self::AuthorizationTokenDisableAging => sys::PAM_AUTHTOK_DISABLE_AGING,
             Self::TryAgain => sys::PAM_TRY_AGAIN,
@@ -171,9 +171,10 @@ impl Into<libc::c_int> for Error {
             Self::Abort => sys::PAM_ABORT,
             Self::AuthorizationTokenExpired => sys::PAM_AUTHTOK_EXPIRED,
             Self::ModuleUnknown => sys::PAM_MODULE_UNKNOWN,
-            Self::BadItem => sys::PAM_BAD_ITEM,
-            Self::ConversationAgain => sys::PAM_CONV_AGAIN,
-            Self::Incomplete => sys::PAM_INCOMPLETE,
+            // Self::BadItem => sys::PAM_BAD_ITEM,
+            // Self::ConversationAgain => sys::PAM_CONV_AGAIN,
+            // Self::Incomplete => sys::PAM_INCOMPLETE,
+            _ => unimplemented!(),
         }
     }
 }

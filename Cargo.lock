@@ -760,7 +760,7 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#fd75229ac2411058c0c6ecbf6d36cca7ee8a0d16"
+source = "git+https://www.github.com/shurizzle/tty-info.git#81e7a290c726297ac311a3cb8412ce68f2bf8e4a"
 dependencies = [
  "apple-errnos",
  "atoi",

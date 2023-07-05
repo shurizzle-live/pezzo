@@ -1,3 +1,5 @@
+#![allow(clippy::useless_conversion)]
+
 use std::{
     ffi::{CString, OsStr},
     fmt,
@@ -11,7 +13,6 @@ use std::{
     path::PathBuf,
     slice::SliceIndex,
 };
-#[cfg(target_os = "linux")]
 use tty_info::Dev;
 
 use fs4::FileExt;
@@ -62,19 +63,10 @@ impl BorrowedEntry {
         }
     }
 
-    #[cfg(target_os = "linux")]
-    #[inline]
-    pub fn set_tty(&mut self, value: Dev) {
-        unsafe {
-            (*self.inner_mut()).tty = value.as_u64();
-        }
-    }
-
-    #[cfg(not(target_os = "linux"))]
     #[inline]
     pub fn set_tty(&mut self, value: u32) {
         unsafe {
-            (*self.inner_mut()).tty = value;
+            (*self.inner_mut()).tty = value.into();
         }
     }
 
@@ -103,25 +95,12 @@ pub struct Entry {
     pub last_login: u64,
 }
 
-#[cfg(not(target_os = "linux"))]
 impl From<Entry> for RawEntry {
     #[inline]
     fn from(value: Entry) -> Self {
         Self {
             session_id: value.session_id,
-            tty: value.tty,
-            last_login: value.last_login,
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
-impl From<Entry> for RawEntry {
-    #[inline]
-    fn from(value: Entry) -> Self {
-        Self {
-            session_id: value.session_id,
-            tty: value.tty.as_u64(),
+            tty: value.tty.into(),
             last_login: value.last_login,
         }
     }

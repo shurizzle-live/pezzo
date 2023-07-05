@@ -3,12 +3,10 @@ mod iam;
 mod io;
 pub mod pam;
 pub mod tty;
-#[cfg(target_os = "linux")]
 #[macro_use]
-pub mod linux;
-#[cfg(target_os = "macos")]
-#[macro_use]
-pub mod bsd;
+#[cfg_attr(target_os = "linux", path = "linux.rs")]
+#[cfg_attr(target_os = "macos", path = "bsd/macos.rs")]
+mod imp;
 use std::{
     ffi::CStr,
     path::Path,
@@ -18,10 +16,8 @@ use tty_info::Dev;
 
 mod process;
 
-#[cfg(target_os = "macos")]
-pub use bsd::*;
-#[cfg(target_os = "linux")]
-pub use linux::*;
+#[allow(unused_imports)]
+pub use imp::*;
 
 pub use common::hostname;
 pub use iam::IAMContext;
@@ -36,7 +32,7 @@ pub mod time {
     pub fn now() -> u64 {
         unsafe {
             core::mem::transmute(
-                unix_clock::raw::Timespec::now(unix_clock::raw::ClockId::Boottime)
+                unix_clock::raw::Timespec::now(super::imp::BOOTTIME_CLOCKID)
                     .unwrap()
                     .secs(),
             )

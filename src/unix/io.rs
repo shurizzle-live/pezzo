@@ -1,15 +1,16 @@
 pub use secure_read::io::AsRawFd;
+use secure_read::io::RawFd;
 pub use std::io::Result;
-use tty_info::CStr;
-pub use tty_info::RawFd;
 
-use std::{
-    io::{Read, Write},
-    os::fd::{AsFd, FromRawFd},
-};
+use std::os::fd::FromRawFd;
+use tty_info::CStr;
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
+        use std::{
+            io::{Read, Write},
+            os::fd::AsFd,
+        };
         use linux_syscalls::{syscall, Sysno};
 
         const O_RDONLY: usize = 0o0000000;

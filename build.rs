@@ -49,17 +49,4 @@ fn main() {
     bindings
         .write_to_file(out_path.join("pam.rs"))
         .expect("Couldn't write bindings!");
-
-    if cfg!(target_os = "macos") {
-        let bindings = bindgen::Builder::default()
-            .header_contents("wrapper.h", "#include <sys/sysctl.h>")
-            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-            .ctypes_prefix("libc")
-            .generate()
-            .expect("Unable to generate bindings");
-
-        bindings
-            .write_to_file(out_path.join("sysctl.rs"))
-            .expect("Couldn't write bindings!");
-    }
 }
