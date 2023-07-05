@@ -12,11 +12,12 @@ impl Drop for NonBlockHolder {
 
 pub fn nonblock<R: io::BufRead + io::AsRawFd>(reader: &mut R) -> io::Result<NonBlockHolder> {
     let flags = unsafe {
-        let res = libc::fcntl(reader.as_raw_fd(), libc::F_GETFL);
-        if res == -1 {
+        let flags = libc::fcntl(reader.as_raw_fd(), libc::F_GETFL);
+        if flags == -1 {
             return Err(io::Error::last_os_error());
         }
-        let flags = res | libc::O_LARGEFILE;
+        #[cfg(target_os = "linux")]
+        let flags = flags | libc::O_LARGEFILE;
 
         if flags & libc::O_NONBLOCK == 0 {
             if libc::fcntl(reader.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) == -1 {

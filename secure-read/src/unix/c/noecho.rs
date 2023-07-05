@@ -6,20 +6,14 @@ pub struct NoEchoHolder(io::RawFd, libc::termios);
 
 impl Drop for NoEchoHolder {
     fn drop(&mut self) {
-        unsafe {
-            libc::ioctl(
-                self.0,
-                libc::TCSETS | libc::TCSANOW as libc::Ioctl,
-                &self.1 as *const _,
-            )
-        };
+        unsafe { libc::tcsetattr(self.0, libc::TCSANOW, &self.1) };
     }
 }
 
 pub fn noecho<R: io::BufRead + io::AsRawFd>(reader: &mut R) -> io::Result<NoEchoHolder> {
     let mut stat = unsafe {
         let mut stat = MaybeUninit::<libc::termios>::uninit();
-        if libc::ioctl(reader.as_raw_fd(), libc::TCGETS, stat.as_mut_ptr()) == -1 {
+        if libc::tcgetattr(reader.as_raw_fd(), stat.as_mut_ptr()) == -1 {
             return Err(io::Error::last_os_error());
         }
         stat.assume_init()
@@ -31,14 +25,7 @@ pub fn noecho<R: io::BufRead + io::AsRawFd>(reader: &mut R) -> io::Result<NoEcho
     stat.c_lflag =
         libc::ISIG | libc::ICANON | libc::ECHOE | libc::ECHOK | libc::ECHONL | libc::IEXTEN;
 
-    if unsafe {
-        libc::ioctl(
-            reader.as_raw_fd(),
-            libc::TCSETS | libc::TCSANOW as libc::Ioctl,
-            &stat as *const _,
-        )
-    } == -1
-    {
+    if unsafe { libc::tcsetattr(reader.as_raw_fd(), libc::TCSANOW, &stat) } == -1 {
         return Err(io::Error::last_os_error());
     }
 
