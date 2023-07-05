@@ -1,5 +1,6 @@
 mod common;
 mod iam;
+mod io;
 pub mod pam;
 pub mod tty;
 #[cfg(target_os = "linux")]
@@ -10,10 +11,10 @@ pub mod linux;
 pub mod bsd;
 use std::{
     ffi::CStr,
-    io,
     path::Path,
     sync::{Arc, Mutex},
 };
+use tty_info::Dev;
 
 mod process;
 
@@ -25,11 +26,23 @@ pub use linux::*;
 pub use common::hostname;
 pub use iam::IAMContext;
 pub use process::*;
-pub use tty::TtyInfo;
+use tty_info::TtyInfo;
 
 use crate::{DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_NAME_CSTR};
 
 use self::tty::{TtyIn, TtyOut};
+
+pub mod time {
+    pub fn now() -> u64 {
+        unsafe {
+            core::mem::transmute(
+                unix_clock::raw::Timespec::now(unix_clock::raw::ClockId::Boottime)
+                    .unwrap()
+                    .secs(),
+            )
+        }
+    }
+}
 
 pub struct Pwd {
     pub name: Box<CStr>,
@@ -55,7 +68,7 @@ pub unsafe fn __errno() -> *mut libc::c_int {
 pub struct Context {
     iam: IAMContext,
     proc_ctx: ProcessContext,
-    tty_ctx: TtyInfo,
+    tty_ctx: Arc<TtyInfo>,
     tty_in: Arc<Mutex<TtyIn>>,
     tty_out: Arc<Mutex<TtyOut>>,
     target_user: User,
@@ -71,9 +84,9 @@ impl Context {
         target_group: Group,
         bell: bool,
     ) -> io::Result<Self> {
-        let tty_ctx = TtyInfo::for_ttyno(proc_ctx.ttyno)?;
-        let tty_in = Arc::new(Mutex::new(tty_ctx.open_in()?));
-        let tty_out = Arc::new(Mutex::new(tty_ctx.open_out()?));
+        let tty_ctx = proc_ctx.tty.clone();
+        let tty_in = Arc::new(Mutex::new(TtyIn::open(tty_ctx.clone())?));
+        let tty_out = Arc::new(Mutex::new(TtyOut::open(tty_ctx.clone())?));
 
         Ok(Self {
             iam,
@@ -123,17 +136,17 @@ impl Context {
     }
 
     #[inline]
-    pub fn ttyno(&self) -> u32 {
-        self.proc_ctx.ttyno
+    pub fn ttyno(&self) -> Dev {
+        self.proc_ctx.tty.device()
     }
 
     #[inline]
-    pub fn tty_path(&self) -> &Path {
+    pub fn tty_path(&self) -> &CStr {
         self.tty_ctx.path()
     }
 
     #[inline]
-    pub fn tty_name(&self) -> &str {
+    pub fn tty_name(&self) -> &CStr {
         self.tty_ctx.name()
     }
 

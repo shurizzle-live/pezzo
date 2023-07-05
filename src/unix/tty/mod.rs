@@ -1,36 +1,22 @@
 use std::{
     fmt,
-    fs::File,
-    io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    os::fd::{AsFd, AsRawFd, FromRawFd, IntoRawFd, RawFd},
-    path::{Path, PathBuf},
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    os::fd::{AsFd, AsRawFd, RawFd},
     sync::Arc,
 };
 
-pub struct TtyInfo {
-    pub(crate) path: Arc<PathBuf>,
-    pub(crate) name: Arc<Box<str>>,
-}
+use super::io::{self, File};
+
+use tty_info::{CStr, TtyInfo};
 
 pub struct TtyIn {
-    path: Arc<PathBuf>,
-    name: Arc<Box<str>>,
-    inner: BufReader<File>,
+    pub(crate) info: Arc<TtyInfo>,
+    pub(crate) inner: BufReader<File>,
 }
 
 pub struct TtyOut {
-    path: Arc<PathBuf>,
-    name: Arc<Box<str>>,
-    inner: BufWriter<File>,
-}
-
-impl fmt::Debug for TtyInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TtyInfo")
-            .field("path", &self.path())
-            .field("name", &self.name())
-            .finish()
-    }
+    pub(crate) info: Arc<TtyInfo>,
+    pub(crate) inner: BufWriter<File>,
 }
 
 impl fmt::Debug for TtyIn {
@@ -79,65 +65,20 @@ impl fmt::Debug for TtyOut {
     }
 }
 
-impl TtyInfo {
-    #[inline]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn open_in(&self) -> io::Result<TtyIn> {
-        let fd = File::options()
-            .read(true)
-            .write(false)
-            .append(false)
-            .create(false)
-            .truncate(false)
-            .create_new(false)
-            .open(self.path())?
-            .into_raw_fd();
-        let f = unsafe { File::from_raw_fd(fd) };
-
-        Ok(TtyIn {
-            path: Arc::clone(&self.path),
-            name: Arc::clone(&self.name),
-            inner: BufReader::new(f),
-        })
-    }
-
-    pub fn open_out(&self) -> io::Result<TtyOut> {
-        let fd = File::options()
-            .read(false)
-            .write(true)
-            .append(false)
-            .create(false)
-            .truncate(false)
-            .create_new(false)
-            .open(self.path())?
-            .into_raw_fd();
-        let f = unsafe { File::from_raw_fd(fd) };
-
-        Ok(TtyOut {
-            path: Arc::clone(&self.path),
-            name: Arc::clone(&self.name),
-            inner: BufWriter::new(f),
-        })
-    }
-}
-
 impl TtyIn {
-    #[inline]
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn open(info: Arc<TtyInfo>) -> io::Result<Self> {
+        let inner = BufReader::new(io::OpenOptions::new().read(true).open_cstr(info.path())?);
+        Ok(Self { info, inner })
     }
 
     #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn path(&self) -> &CStr {
+        self.info.path()
+    }
+
+    #[inline]
+    pub fn name(&self) -> &CStr {
+        self.info.name()
     }
 
     #[inline]
@@ -223,14 +164,19 @@ impl BufRead for TtyIn {
 }
 
 impl TtyOut {
-    #[inline]
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn open(info: Arc<TtyInfo>) -> io::Result<Self> {
+        let inner = BufWriter::new(io::OpenOptions::new().write(true).open_cstr(info.path())?);
+        Ok(Self { info, inner })
     }
 
     #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn path(&self) -> &CStr {
+        self.info.path()
+    }
+
+    #[inline]
+    pub fn name(&self) -> &CStr {
+        self.info.name()
     }
 }
 
@@ -260,7 +206,7 @@ impl Write for TtyOut {
     }
 
     #[inline]
-    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
+    fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> io::Result<usize> {
         self.inner.write_vectored(bufs)
     }
 
@@ -292,7 +238,7 @@ impl Drop for TtyIn {
         self.inner.consume(max_len);
         while {
             match self.inner.fill_buf() {
-                Err(err) if err.kind() == io::ErrorKind::Interrupted => true,
+                Err(err) if err.kind() == std::io::ErrorKind::Interrupted => true,
                 Err(_) => false,
                 Ok(_) => {
                     let l = self.inner.buffer().len();

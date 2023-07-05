@@ -2,6 +2,7 @@ mod context;
 mod util;
 
 use context::MatchContext;
+use tty_info::Dev;
 use util::*;
 
 use std::{
@@ -16,7 +17,10 @@ use clap::Parser;
 use pezzo::{
     conf::Env,
     database::{Database, Entry},
-    unix::{tty::TtyOut, IAMContext, ProcessContext},
+    unix::{
+        tty::{TtyIn, TtyOut},
+        IAMContext, ProcessContext,
+    },
     DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, DEFAULT_SESSION_TIMEOUT, PEZZO_NAME_CSTR,
 };
 
@@ -82,7 +86,7 @@ fn _main() -> Result<()> {
         iam.escalate_permissions()
             .context("Cannot set root permissions")?;
         let mut db = Database::new(proc.original_user.name()).context("Cannot open database")?;
-        db.retain(|e| e.session_id() != proc.sid && e.tty() != proc.ttyno);
+        db.retain(|e| e.session_id() != proc.sid && e.tty() != proc.tty.device());
         db.save().context("Cannot save database")?;
         return Ok(());
     }
@@ -94,14 +98,16 @@ fn _main() -> Result<()> {
         if is_expired(
             proc.original_user.name(),
             proc.sid,
-            proc.ttyno,
+            proc.tty.device(),
             DEFAULT_SESSION_TIMEOUT,
         )? {
-            let tty_info =
-                pezzo::unix::TtyInfo::for_ttyno(proc.ttyno).context("Cannot get a valid tty")?;
+            let tty_info = Arc::new(
+                tty_info::TtyInfo::by_device(proc.tty.device())
+                    .context("Cannot get a valid tty")?,
+            );
 
             let out = Arc::new(Mutex::new(
-                tty_info.open_out().context("Cannot get a valid tty")?,
+                TtyOut::open(tty_info.clone()).context("Cannot get a valid tty")?,
             ));
 
             let mut auth = pezzo::unix::pam::Authenticator::new(
@@ -110,7 +116,7 @@ fn _main() -> Result<()> {
                 pezzo::unix::pam::PezzoConversation::from_values(
                     DEFAULT_PROMPT_TIMEOUT,
                     Arc::new(Mutex::new(
-                        tty_info.open_in().context("Cannot get a valid tty")?,
+                        TtyIn::open(tty_info).context("Cannot get a valid tty")?,
                     )),
                     out.clone(),
                     proc.original_user.name(),
@@ -122,7 +128,7 @@ fn _main() -> Result<()> {
             autenticate(&mut auth, DEFAULT_MAX_RETRIES, out);
         }
 
-        update_db(proc.original_user.name(), proc.sid, proc.ttyno)?;
+        update_db(proc.original_user.name(), proc.sid, proc.tty.device())?;
         return Ok(());
     }
 
@@ -257,7 +263,7 @@ fn main() {
     }
 }
 
-fn update_db(user_name: &CStr, sid: u32, ttyno: u32) -> Result<()> {
+fn update_db(user_name: &CStr, sid: u32, ttyno: Dev) -> Result<()> {
     let mut db = Database::new(user_name).context("Failed to open database")?;
     db.retain(|e| e.session_id() != sid && e.tty() != ttyno);
     db.push(Entry {
@@ -268,7 +274,7 @@ fn update_db(user_name: &CStr, sid: u32, ttyno: u32) -> Result<()> {
     db.save().context("Unable to write database")
 }
 
-fn is_expired(user_name: &CStr, sid: u32, ttyno: u32, timeout: u64) -> Result<bool> {
+fn is_expired(user_name: &CStr, sid: u32, ttyno: Dev, timeout: u64) -> Result<bool> {
     let db = Database::new(user_name).context("Failed to open database")?;
     if let Some(entry) = db
         .iter()

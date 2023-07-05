@@ -11,12 +11,17 @@ use std::{
     path::PathBuf,
     slice::SliceIndex,
 };
+#[cfg(target_os = "linux")]
+use tty_info::Dev;
 
 use fs4::FileExt;
 
 #[repr(packed)]
 pub struct RawEntry {
     pub session_id: u32,
+    #[cfg(target_os = "linux")]
+    pub tty: u64,
+    #[cfg(not(target_os = "linux"))]
     pub tty: u32,
     pub last_login: u64,
 }
@@ -41,8 +46,8 @@ impl BorrowedEntry {
     }
 
     #[inline]
-    pub fn tty(&self) -> u32 {
-        unsafe { (*self.inner()).tty }
+    pub fn tty(&self) -> Dev {
+        unsafe { (*self.inner()).tty.into() }
     }
 
     #[inline]
@@ -57,6 +62,15 @@ impl BorrowedEntry {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    #[inline]
+    pub fn set_tty(&mut self, value: Dev) {
+        unsafe {
+            (*self.inner_mut()).tty = value.as_u64();
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
     #[inline]
     pub fn set_tty(&mut self, value: u32) {
         unsafe {
@@ -85,10 +99,11 @@ impl fmt::Debug for BorrowedEntry {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Entry {
     pub session_id: u32,
-    pub tty: u32,
+    pub tty: Dev,
     pub last_login: u64,
 }
 
+#[cfg(not(target_os = "linux"))]
 impl From<Entry> for RawEntry {
     #[inline]
     fn from(value: Entry) -> Self {
@@ -100,12 +115,24 @@ impl From<Entry> for RawEntry {
     }
 }
 
+#[cfg(target_os = "linux")]
+impl From<Entry> for RawEntry {
+    #[inline]
+    fn from(value: Entry) -> Self {
+        Self {
+            session_id: value.session_id,
+            tty: value.tty.as_u64(),
+            last_login: value.last_login,
+        }
+    }
+}
+
 impl From<RawEntry> for Entry {
     #[inline]
     fn from(value: RawEntry) -> Self {
         Self {
             session_id: value.session_id,
-            tty: value.tty,
+            tty: value.tty.into(),
             last_login: value.last_login,
         }
     }

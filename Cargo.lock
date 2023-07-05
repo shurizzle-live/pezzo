@@ -261,6 +261,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cstr_core"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd98742e4fdca832d40cab219dc2e3048de17d873248f83f17df47c1bea70956"
+dependencies = [
+ "cty",
+ "memchr",
+]
+
+[[package]]
 name = "ctor"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,6 +279,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "cty"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
 name = "digest"
@@ -387,6 +403,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "itoap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9028f49264629065d057f340a86acb84867925865f73bbf8d47b4d149a7e88b8"
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -434,6 +456,17 @@ name = "linux-raw-vdso"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8619a6285fa6021d7ccda74527b1ff676c63d6463c038108b71cca8f6b2a014d"
+
+[[package]]
+name = "linux-stat"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11b3f875871646a1d9c9efbc401cf63d5b8295e5f18bceca65d46eb7b6ddd2f2"
+dependencies = [
+ "cstr_core",
+ "cty",
+ "linux-syscalls",
+]
 
 [[package]]
 name = "linux-syscalls"
@@ -544,14 +577,18 @@ dependencies = [
  "anyhow",
  "atoi",
  "bindgen",
+ "cfg-if",
  "clap",
  "ctor",
  "fs4",
  "globset",
  "libc",
+ "linux-syscalls",
  "memchr",
  "peg",
  "secure-read",
+ "tty-info",
+ "unix-clock 0.1.0 (git+https://www.github.com/shurizzle/unix-clock.git)",
  "which",
 ]
 
@@ -671,7 +708,7 @@ dependencies = [
  "libc",
  "linux-syscalls",
  "memchr",
- "unix-clock",
+ "unix-clock 0.1.0 (git+https://github.com/shurizzle/unix-clock)",
 ]
 
 [[package]]
@@ -721,6 +758,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tty-info"
+version = "0.1.0"
+source = "git+https://www.github.com/shurizzle/tty-info.git#fd75229ac2411058c0c6ecbf6d36cca7ee8a0d16"
+dependencies = [
+ "apple-errnos",
+ "atoi",
+ "bindgen",
+ "itoap",
+ "libc",
+ "linux-stat",
+ "linux-syscalls",
+ "memchr",
+]
+
+[[package]]
 name = "typenum"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -736,6 +788,17 @@ checksum = "22049a19f4a68748a168c0fc439f9516686aa045927ff767eca0a85101fb6e73"
 name = "unix-clock"
 version = "0.1.0"
 source = "git+https://github.com/shurizzle/unix-clock#d4494ed72c027f5c81d7930ffb67e083da8b4f46"
+dependencies = [
+ "apple-errnos",
+ "cfg-if",
+ "libc",
+ "linux-syscalls",
+]
+
+[[package]]
+name = "unix-clock"
+version = "0.1.0"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#d4494ed72c027f5c81d7930ffb67e083da8b4f46"
 dependencies = [
  "apple-errnos",
  "cfg-if",

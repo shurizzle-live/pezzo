@@ -1,11 +1,3 @@
-pub mod proc;
-pub mod time;
-pub mod tty;
-
-pub use proc::context::*;
-
-use std::fmt;
-
 #[macro_export]
 macro_rules! prefix {
     ($p:literal) => {
@@ -13,98 +5,82 @@ macro_rules! prefix {
     };
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Version {
-    pub major: u32,
-    pub minor: u32,
-    pub revision: u32,
-}
+use std::{io, ptr, sync::Arc};
 
-impl fmt::Display for Version {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{}.{}", self.major, self.minor, self.revision)
+use tty_info::ProcessInfo;
+
+use super::{
+    process::{Group, User},
+    IAMContext, ProcessContext,
+};
+
+pub fn get_groups() -> io::Result<Vec<u32>> {
+    unsafe {
+        let len = libc::getgroups(0, ptr::null_mut());
+        if len == -1 {
+            return Err(io::Error::last_os_error());
+        }
+        let mut buf = Vec::with_capacity(len as usize);
+        let len = libc::getgroups(len, buf.as_mut_ptr());
+        if len == -1 {
+            return Err(io::Error::last_os_error());
+        }
+        buf.set_len(len as usize);
+        println!("{:?}", buf);
+
+        Ok(buf)
     }
 }
 
-#[macro_export]
-macro_rules! version {
-    (>  $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version()  > $crate::version!($($rest)+)
-    };
-    (<  $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version()  < $crate::version!($($rest)+)
-    };
-    (== $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version() == $crate::version!($($rest)+)
-    };
-    (>= $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version() >= $crate::version!($($rest)+)
-    };
-    (<= $($rest:tt)+) => {
-        $crate::unix::linux::kernel_version() <= $crate::version!($($rest)+)
-    };
-    ($major:expr) => {
-        $crate::version!($major, 0)
-    };
-    ($major:expr, $minor:expr) => {
-        $crate::version!($major, $minor, 0)
-    };
-    ($major:expr, $minor:expr, $revision:expr) => {
-        $crate::unix::linux::Version {
-            major: $major,
-            minor: $minor,
-            revision: $revision,
-        }
-    };
-}
+impl ProcessContext {
+    pub fn current(iam: &IAMContext) -> io::Result<Self> {
+        let ProcessInfo { pid, session, tty } = ProcessInfo::current()?;
 
-static mut KERNEL_VERSION: Version = version!(0);
+        let tty = if let Some(tty) = tty {
+            tty
+        } else {
+            return Err(io::ErrorKind::NotFound.into());
+        };
 
-#[ctor::ctor]
-fn _kernel_version_ctor() {
-    pub fn _get_kernel_version() -> Option<Version> {
-        use atoi::FromRadix10;
+        let uid: u32 = unsafe { libc::getuid() };
+        let gid: u32 = unsafe { libc::getgid() };
 
-        let uts = super::common::uname().ok()?;
-        let release = uts.release().to_bytes();
+        iam.set_effective_identity(uid, gid)?;
 
-        let (major, length) = u32::from_radix_10(release);
-        if length == 0 || !matches!(release.get(length), Some(b'.')) {
-            return None;
-        }
-        let release = unsafe { release.get_unchecked((length + 1)..) };
+        let exe = std::fs::canonicalize(std::env::current_exe()?)?;
 
-        let (minor, length) = u32::from_radix_10(release);
-        if length == 0 || !matches!(release.get(length), Some(b'.')) {
-            return None;
-        }
-        let release = unsafe { release.get_unchecked((length + 1)..) };
+        let user_name = if let Some(user_name) = iam.user_name_by_id(uid)? {
+            user_name
+        } else {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "invalid user"));
+        };
 
-        let (revision, length) = u32::from_radix_10(release);
-        if length == 0 {
-            return None;
-        }
+        let group_name = if let Some(group_name) = iam.group_name_by_id(gid)? {
+            group_name
+        } else {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "invalid group"));
+        };
 
-        Some(Version {
-            major,
-            minor,
-            revision,
+        let original_user = User {
+            name: user_name,
+            id: uid,
+        };
+
+        let original_group = Group {
+            name: group_name,
+            id: gid,
+        };
+
+        let original_groups = iam.get_groups(original_user.name())?;
+
+        Ok(Self {
+            exe,
+            pid,
+            original_user,
+            original_group,
+            original_groups,
+            sid: session,
+            tty: Arc::new(tty),
         })
     }
-
-    unsafe {
-        if let Some(v) = _get_kernel_version() {
-            KERNEL_VERSION = v;
-        } else {
-            const ERRMSG: &[u8] = b"Invalid kernel version\n\0";
-            _ = libc::write(2, ERRMSG.as_ptr() as *const libc::c_void, ERRMSG.len() - 1);
-            libc::exit(1);
-        }
-    }
-}
-
-#[inline(always)]
-pub fn kernel_version() -> Version {
-    unsafe { KERNEL_VERSION }
 }
