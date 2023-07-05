@@ -11,7 +11,7 @@ cfg_if::cfg_if! {
             io::{Read, Write},
             os::fd::AsFd,
         };
-        use linux_syscalls::{syscall, Sysno};
+        use linux_syscalls::{syscall, Sysno, Errno};
 
         const O_RDONLY: usize = 0o0000000;
         const O_WRONLY: usize = 0o0000001;
@@ -36,14 +36,26 @@ cfg_if::cfg_if! {
         impl Read for File {
             #[inline]
             fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-                Ok(unsafe { syscall!(Sysno::read, self.fd, buf.as_mut_ptr(), buf.len()) }?)
+                loop {
+                    match unsafe { syscall!(Sysno::read, self.fd, buf.as_mut_ptr(), buf.len()) } {
+                        Err(Errno::EINTR) => (),
+                        Err(err) => return Err(err.into()),
+                        Ok(len) => return Ok(len),
+                    }
+                }
             }
         }
 
         impl Write for File {
             #[inline]
             fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                Ok(unsafe { syscall!([ro] Sysno::write, self.fd, buf.as_ptr(), buf.len()) }?)
+                loop {
+                    match unsafe { syscall!([ro] Sysno::write, self.fd, buf.as_ptr(), buf.len()) } {
+                        Err(Errno::EINTR) => (),
+                        Err(err) => return Err(err.into()),
+                        Ok(len) => return Ok(len),
+                    }
+                }
             }
 
             #[inline(always)]
@@ -179,7 +191,13 @@ impl OpenOptions {
         }
         #[cfg(target_os = "linux")]
         {
-            Ok(unsafe { File::from_raw_fd(syscall!(Sysno::open, path.as_ptr(), flags)? as RawFd) })
+            loop {
+                match unsafe { syscall!(Sysno::open, path.as_ptr(), flags).map(|fd| fd as RawFd) } {
+                    Err(Errno::EINTR) => (),
+                    Err(err) => return Err(err.into()),
+                    Ok(fd) => return Ok(unsafe { File::from_raw_fd(fd) }),
+                }
+            }
         }
     }
 }
