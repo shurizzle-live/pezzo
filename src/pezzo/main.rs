@@ -247,6 +247,9 @@ fn _main() -> Result<()> {
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    linux_syscalls::init();
+
     if let Err(err) = _main() {
         // eprintln!("{}.", err);
         eprintln!("{:?}", err);
