@@ -31,25 +31,70 @@ pub fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
         Ok(md) => {
             if md.st_uid() != 0 || (md.permissions().mode() & 0o022) != 0 {
                 bail!(
-                    "Wrong permissions on file '{}`. Your system has been compromised",
+                    "Wrong permissions on file {:?}. Your system has been compromised",
                     path.display()
                 );
             }
         }
         Err(_) => {
-            bail!("Cannot find file '{}`", path.display());
+            bail!("Cannot find file {:?}", path.display());
         }
     }
 
     Ok(())
 }
 
-pub fn parse_conf<P: AsRef<Path>>(path: P) -> Result<pezzo::conf::Rules> {
+#[cfg(not(target_os = "linux"))]
+pub fn check_file_permissions_cstr<P: AsRef<CStr>>(path: P) -> Result<()> {
     let path = path.as_ref();
 
-    check_file_permissions(path)?;
+    let mut buf = std::mem::MaybeUninit::<libc::stat64>::uninit();
+    let md = loop {
+        if unsafe { libc::stat64(path.as_ptr().cast(), buf.as_mut_ptr()) == -1 } {
+            let err = std::io::Error::last_os_error();
+            if err.kind() != std::io::ErrorKind::Interrupted {
+                bail!("Cannot stat file {:?}", path);
+            }
+        } else {
+            break unsafe { buf.assume_init() };
+        }
+    };
 
-    let content = pezzo::util::slurp(path).context("Cannot read configuration file")?;
+    if md.st_uid != 0 || md.st_mode & 0o022 != 0 {
+        bail!(
+            "Wrong permissions on file {:?}. Your system has been compromised",
+            path
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub fn check_file_permissions_cstr<P: AsRef<CStr>>(path: P) -> Result<()> {
+    let path = path.as_ref();
+
+    let md = loop {
+        match linux_stat::stat_cstr(path) {
+            Err(linux_stat::Errno::EINTR) => (),
+            Err(_) => bail!("Cannot stat file {:?}", path),
+            Ok(md) => break md,
+        }
+    };
+
+    if md.uid() != 0 || md.mode().as_u16() & 0o022 != 0 {
+        bail!(
+            "Wrong permissions on file {:?}. Your system has been compromised",
+            path
+        );
+    }
+
+    Ok(())
+}
+
+#[inline(always)]
+fn _parse_conf<F: FnOnce() -> std::io::Result<Vec<u8>>>(f: F) -> Result<pezzo::conf::Rules> {
+    let content = f().context("Cannot read configuration file")?;
     match pezzo::conf::parse(&content) {
         Ok(c) => Ok(c),
         Err(err) => {
@@ -71,4 +116,10 @@ pub fn parse_conf<P: AsRef<Path>>(path: P) -> Result<pezzo::conf::Rules> {
             );
         }
     }
+}
+
+pub fn parse_conf_cstr<P: AsRef<CStr>>(path: P) -> Result<pezzo::conf::Rules> {
+    let path = path.as_ref();
+    check_file_permissions_cstr(path)?;
+    _parse_conf(|| pezzo::util::slurp_cstr(path))
 }

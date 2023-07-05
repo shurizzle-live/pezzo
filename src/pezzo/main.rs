@@ -134,7 +134,9 @@ fn _main() -> Result<()> {
 
     let ctx = MatchContext::new(iam, proc, user, group, args)?;
 
-    let rules = parse_conf(pezzo::prefix!("/etc/pezzo.conf"))?;
+    let rules = parse_conf_cstr(unsafe {
+        CStr::from_ptr(pezzo::prefix!("/etc/pezzo.conf\0").as_ptr().cast())
+    })?;
 
     let match_res = if let Some(res) = ctx.matches(&rules)? {
         res

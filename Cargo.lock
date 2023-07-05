@@ -583,6 +583,7 @@ dependencies = [
  "fs4",
  "globset",
  "libc",
+ "linux-stat",
  "linux-syscalls",
  "memchr",
  "peg",

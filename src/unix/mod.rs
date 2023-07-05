@@ -1,6 +1,6 @@
 mod common;
 mod iam;
-mod io;
+pub(crate) mod io;
 pub mod pam;
 pub mod tty;
 #[macro_use]
