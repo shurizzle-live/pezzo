@@ -1,21 +1,15 @@
 #![allow(clippy::useless_conversion)]
 
+use super::unix::io::{self, FileExt};
+
 use std::{
-    ffi::{CString, OsStr},
+    ffi::{CStr, CString},
     fmt,
-    fs::{DirBuilder, File, OpenOptions},
-    io::{self, Read, Seek, SeekFrom, Write},
+    io::{Read, Seek, SeekFrom, Write},
     mem,
-    os::unix::{
-        fs::DirBuilderExt,
-        prelude::{OpenOptionsExt, OsStrExt},
-    },
-    path::PathBuf,
     slice::SliceIndex,
 };
 use tty_info::Dev;
-
-use fs4::FileExt;
 
 #[repr(packed)]
 pub struct RawEntry {
@@ -117,13 +111,13 @@ impl From<RawEntry> for Entry {
     }
 }
 
-const BASE_PATH: &str = "/var/run/pezzo";
+const BASE_PATH: &[u8] = b"/var/run/pezzo\0";
 
 fn create_base() -> io::Result<()> {
-    DirBuilder::new()
+    io::DirBuilder::new()
         .mode(0o700)
         .recursive(true)
-        .create(BASE_PATH)
+        .create(unsafe { CStr::from_ptr(BASE_PATH.as_ptr().cast()) })
 }
 
 pub struct Database {
@@ -142,9 +136,16 @@ impl Database {
 
         create_base()?;
 
-        let path = PathBuf::from(BASE_PATH).join(OsStr::from_bytes(user.to_bytes()));
-        let mut f = match File::open(path) {
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+        let mut buf = BASE_PATH.to_vec();
+        buf.pop();
+        buf.push(b'/');
+        buf.extend_from_slice(user.to_bytes());
+        buf.push(0);
+        buf.shrink_to_fit();
+        let path = unsafe { CString::from_vec_with_nul_unchecked(buf) };
+
+        let mut f = match io::OpenOptions::new().read(true).open_cstr(path) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(Self {
                     user,
                     inner: Vec::new(),
@@ -249,8 +250,15 @@ impl Database {
     pub fn save(&self) -> io::Result<()> {
         create_base()?;
 
-        let path = PathBuf::from(BASE_PATH).join(OsStr::from_bytes(self.user.to_bytes()));
-        let mut file = OpenOptions::new()
+        let mut buf = BASE_PATH.to_vec();
+        buf.pop();
+        buf.push(b'/');
+        buf.extend_from_slice(self.user.to_bytes());
+        buf.push(0);
+        buf.shrink_to_fit();
+        let path = unsafe { CString::from_vec_with_nul_unchecked(buf) };
+
+        let mut file = io::OpenOptions::new()
             .read(false)
             .write(true)
             .append(false)
@@ -258,7 +266,7 @@ impl Database {
             .create(true)
             .create_new(false)
             .mode(0o700)
-            .open(path)?;
+            .open_cstr(path)?;
 
         file.lock_exclusive()?;
         file.set_len(0)?;
@@ -279,14 +287,18 @@ impl Database {
     }
 
     #[inline]
-    pub fn delete<S: Into<CString>>(user: S) -> io::Result<()> {
-        let user = user.into();
-
+    pub fn delete<S: AsRef<CStr>>(user: S) -> io::Result<()> {
         create_base()?;
 
-        let path = PathBuf::from(BASE_PATH).join(OsStr::from_bytes(user.to_bytes()));
-        match std::fs::remove_file(path) {
-            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        let mut buf = BASE_PATH.to_vec();
+        buf.pop();
+        buf.push(b'/');
+        buf.extend_from_slice(user.as_ref().to_bytes());
+        buf.push(0);
+        let path = unsafe { CString::from_vec_with_nul_unchecked(buf) };
+
+        match io::remove_file(path) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
             other => other,
         }
     }

@@ -1,9 +1,14 @@
-pub use secure_read::io::AsRawFd;
-use secure_read::io::RawFd;
-pub use std::io::Result;
+use std::io::{Seek, SeekFrom};
 
-use std::os::fd::FromRawFd;
 use tty_info::CStr;
+
+use super::{AsRawFd, FromRawFd, RawFd};
+
+pub trait FileExt {
+    fn lock_shared(&mut self) -> std::io::Result<()>;
+
+    fn lock_exclusive(&mut self) -> std::io::Result<()>;
+}
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
@@ -22,8 +27,22 @@ cfg_if::cfg_if! {
         const O_EXCL: usize = 0o00000200;
         const O_CLOEXEC: usize = 0o2000000;
 
+        const LOCK_SH: usize = 1;
+        const LOCK_EX: usize = 2;
+
+        const SEEK_SET: usize = 0;
+        const SEEK_CUR: usize = 1;
+        const SEEK_END: usize = 2;
+
         pub struct File {
             fd: RawFd,
+        }
+
+        impl File {
+            pub fn set_len(&mut self, size: u64) -> std::io::Result<()> {
+                _ = unsafe { syscall!([ro] Sysno::ftruncate, self.fd, size)? };
+                Ok(())
+            }
         }
 
         impl AsRawFd for File {
@@ -75,6 +94,57 @@ cfg_if::cfg_if! {
             #[inline]
             unsafe fn from_raw_fd(fd: RawFd) -> Self {
                 Self { fd }
+            }
+        }
+
+        impl FileExt for File {
+            fn lock_shared(&mut self) -> std::io::Result<()> {
+                loop {
+                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LOCK_SH) } {
+                        Err(Errno::EINTR) => println!("EINTR"),
+                        Err(err) => return Err(err.into()),
+                        Ok(_) => return Ok(()),
+                    }
+                }
+            }
+
+            fn lock_exclusive(&mut self) -> std::io::Result<()> {
+                loop {
+                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LOCK_EX) } {
+                        Err(Errno::EINTR) => println!("EINTR"),
+                        Err(err) => return Err(err.into()),
+                        Ok(_) => return Ok(()),
+                    }
+                }
+            }
+        }
+
+        impl Seek for File {
+            fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+                #[inline(always)]
+                unsafe fn lseek<F: AsRawFd>(fd: F, pos: SeekFrom) -> std::io::Result<u64> {
+                    Ok(match pos {
+                        SeekFrom::Start(pos) => syscall!([ro] Sysno::lseek, fd.as_raw_fd(), pos, SEEK_SET),
+                        SeekFrom::Current(pos) => {
+                            syscall!([ro] Sysno::lseek, fd.as_raw_fd(), pos, SEEK_CUR)
+                        }
+                        SeekFrom::End(pos) => syscall!([ro] Sysno::lseek, fd.as_raw_fd(), pos, SEEK_END),
+                    }? as u64)
+                }
+
+                loop {
+                    match unsafe { lseek(self.as_raw_fd(), pos) } {
+                        Err(err) if err.kind() == std::io::ErrorKind::Interrupted => (),
+                        Err(err) => return Err(err),
+                        Ok(prev) => return Ok(prev),
+                    }
+                }
+            }
+        }
+
+        impl Drop for File {
+            fn drop(&mut self) {
+                unsafe { _ = syscall!([ro] Sysno::close, self.as_raw_fd()) };
             }
         }
     } else {
@@ -185,7 +255,9 @@ impl OpenOptions {
         })
     }
 
-    pub fn open_cstr(&self, path: &CStr) -> std::io::Result<File> {
+    pub fn open_cstr<P: AsRef<CStr>>(&self, path: P) -> std::io::Result<File> {
+        let path = path.as_ref();
+
         let flags = O_CLOEXEC | self.get_access_mode()? | self.get_creation_mode()?;
         #[cfg(not(target_os = "linux"))]
         {
@@ -207,6 +279,17 @@ impl OpenOptions {
                     Ok(fd) => return Ok(unsafe { File::from_raw_fd(fd) }),
                 }
             }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn remove_file<P: AsRef<CStr>>(path: P) -> std::io::Result<()> {
+    loop {
+        match unsafe { syscall!([ro] Sysno::unlink, path.as_ref().as_ptr()).map(|_| ()) } {
+            Err(Errno::EINTR) => (),
+            Err(err) => return Err(err.into()),
+            Ok(()) => return Ok(()),
         }
     }
 }
