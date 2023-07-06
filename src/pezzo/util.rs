@@ -19,29 +19,68 @@ pub fn parse_box_c_str(input: &str) -> Result<Box<CStr>, &'static str> {
     }
 }
 
-pub fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
-    #[cfg(target_os = "linux")]
-    use std::os::linux::fs::MetadataExt;
-    #[cfg(target_os = "macos")]
-    use std::os::macos::fs::MetadataExt;
-    use std::os::unix::prelude::PermissionsExt;
+#[inline]
+pub fn run_path_with_cstr<T, E, F>(path: &Path, f: F) -> Result<T, E>
+where
+    E: From<std::io::Error>,
+    F: FnOnce(&CStr) -> Result<T, E>,
+{
+    use std::os::unix::prelude::OsStrExt;
 
-    let path = path.as_ref();
-    match path.metadata() {
-        Ok(md) => {
-            if md.st_uid() != 0 || (md.permissions().mode() & 0o022) != 0 {
-                bail!(
-                    "Wrong permissions on file {:?}. Your system has been compromised",
-                    path.display()
-                );
-            }
-        }
-        Err(_) => {
-            bail!("Cannot find file {:?}", path.display());
-        }
+    run_with_cstr(path.as_os_str().as_bytes(), f)
+}
+
+#[inline]
+pub fn run_with_cstr<T, E, F>(bytes: &[u8], f: F) -> Result<T, E>
+where
+    E: From<std::io::Error>,
+    F: FnOnce(&CStr) -> Result<T, E>,
+{
+    const MAX_STACK_ALLOCATION: usize = 384;
+
+    if bytes.len() >= MAX_STACK_ALLOCATION {
+        return run_with_cstr_allocating(bytes, f);
     }
 
-    Ok(())
+    let mut buf = std::mem::MaybeUninit::<[u8; MAX_STACK_ALLOCATION]>::uninit();
+    let buf_ptr = buf.as_mut_ptr() as *mut u8;
+
+    unsafe {
+        core::ptr::copy_nonoverlapping(bytes.as_ptr(), buf_ptr, bytes.len());
+        buf_ptr.add(bytes.len()).write(0);
+    }
+
+    match CStr::from_bytes_with_nul(unsafe {
+        core::slice::from_raw_parts(buf_ptr, bytes.len() + 1)
+    }) {
+        Ok(s) => f(s),
+        Err(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "file name contained an unexpected NUL byte",
+        )
+        .into()),
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn run_with_cstr_allocating<T, E, F>(bytes: &[u8], f: F) -> Result<T, E>
+where
+    E: From<std::io::Error>,
+    F: FnOnce(&CStr) -> Result<T, E>,
+{
+    match CString::new(bytes) {
+        Ok(s) => f(&s),
+        Err(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "file name contained an unexpected NUL byte",
+        )
+        .into()),
+    }
+}
+
+pub fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
+    run_path_with_cstr(path.as_ref(), |p| check_file_permissions_cstr(p))
 }
 
 #[cfg(not(target_os = "linux"))]
