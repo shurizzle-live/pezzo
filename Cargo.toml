@@ -34,11 +34,13 @@ ctor = "0.2.0"
 linux-syscalls = "0.1.3"
 linux-stat = "0.3.1"
 
+[target.'cfg(all(unix, not(target_os = "linux")))'.dependencies]
+fs4 = "0.6.3"
+
 [dependencies]
 peg = "0.8.1"
 clap = { version = "4.1.13", features = ["derive"] }
 which = "4.4.0"
 globset = { version = "0.4.10", features = ["simd-accel"] }
 anyhow = "1.0.70"
-fs4 = "0.6.3"
 secure-read = { path = "secure-read", features = ["c"] }

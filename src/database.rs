@@ -1,6 +1,6 @@
 #![allow(clippy::useless_conversion)]
 
-use super::unix::io::{self, FileExt};
+use super::io::{self, FileExt};
 
 use std::{
     ffi::{CStr, CString},

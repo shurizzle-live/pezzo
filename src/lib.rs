@@ -2,6 +2,7 @@ use std::ffi::CStr;
 
 pub mod conf;
 pub mod database;
+pub mod io;
 #[cfg(unix)]
 pub mod unix;
 pub mod util;

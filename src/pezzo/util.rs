@@ -48,9 +48,9 @@ pub fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
 pub fn check_file_permissions_cstr<P: AsRef<CStr>>(path: P) -> Result<()> {
     let path = path.as_ref();
 
-    let mut buf = std::mem::MaybeUninit::<libc::stat64>::uninit();
+    let mut buf = std::mem::MaybeUninit::<libc::stat>::uninit();
     let md = loop {
-        if unsafe { libc::stat64(path.as_ptr().cast(), buf.as_mut_ptr()) == -1 } {
+        if unsafe { libc::stat(path.as_ptr().cast(), buf.as_mut_ptr()) == -1 } {
             let err = std::io::Error::last_os_error();
             if err.kind() != std::io::ErrorKind::Interrupted {
                 bail!("Cannot stat file {:?}", path);

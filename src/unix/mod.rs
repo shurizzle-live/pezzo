@@ -1,6 +1,5 @@
 mod common;
 mod iam;
-pub(crate) mod io;
 pub mod pam;
 pub mod tty;
 #[macro_use]
@@ -24,7 +23,7 @@ pub use iam::IAMContext;
 pub use process::*;
 use tty_info::TtyInfo;
 
-use crate::{DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_NAME_CSTR};
+use crate::{io, DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_NAME_CSTR};
 
 use self::tty::{TtyIn, TtyOut};
 

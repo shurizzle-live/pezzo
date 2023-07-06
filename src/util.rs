@@ -46,7 +46,7 @@ cfg_if::cfg_if! {
                 }
             } else {
                 pub fn slurp_cstr<P: AsRef<tty_info::CStr>>(path: P) -> std::io::Result<Vec<u8>> {
-                    use super::unix::io;
+                    use super::io;
                     use io::AsRawFd;
                     use std::io::Read;
                     use tty_info::Errno;
@@ -54,9 +54,9 @@ cfg_if::cfg_if! {
 
                     let mut f = io::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
                     let len = 'stat: loop {
-                        let mut buf = MaybeUninit::<libc::stat64>::uninit();
+                        let mut buf = MaybeUninit::<libc::stat>::uninit();
                         match unsafe {
-                            if libc::fstat64(f.as_raw_fd(), buf.as_mut_ptr()) == -1 {
+                            if libc::fstat(f.as_raw_fd(), buf.as_mut_ptr()) == -1 {
                                 Err(Errno::last_os_error())
                             } else {
                                 Ok(buf.assume_init())

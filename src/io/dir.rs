@@ -306,8 +306,8 @@ impl<'a> Drop for DirBuilderBuffer<'a> {
 fn is_dir(path: &CStr) -> bool {
     use std::mem::MaybeUninit;
     let md = unsafe {
-        let mut buf = MaybeUninit::<libc::stat64>::uninit();
-        if { libc::stat64(path.as_ptr(), buf.as_mut_ptr()) } == -1 {
+        let mut buf = MaybeUninit::<libc::stat>::uninit();
+        if { libc::stat(path.as_ptr(), buf.as_mut_ptr()) } == -1 {
             return false;
         }
         buf.assume_init()
@@ -330,7 +330,7 @@ fn is_dir(path: &CStr) -> bool {
 
 pub struct DirBuilder {
     recursive: bool,
-    mode: u32,
+    mode: u16,
 }
 
 impl DirBuilder {
@@ -349,7 +349,7 @@ impl DirBuilder {
     }
 
     #[inline]
-    pub fn mode(&mut self, mode: u32) -> &mut Self {
+    pub fn mode(&mut self, mode: u16) -> &mut Self {
         self.mode = mode;
         self
     }
