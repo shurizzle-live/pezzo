@@ -22,7 +22,7 @@ cfg_if::cfg_if! {
         cfg_if::cfg_if! {
             if #[cfg(target_os = "linux")] {
                 pub fn slurp_cstr<P: AsRef<tty_info::CStr>>(path: P) -> std::io::Result<Vec<u8>> {
-                    use super::unix::io;
+                    use super::io;
                     use io::AsRawFd;
                     use std::io::Read;
                     use tty_info::Errno;
