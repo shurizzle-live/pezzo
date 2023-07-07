@@ -1,4 +1,3 @@
-use linux_stat::CURRENT_DIRECTORY;
 use tty_info::CStr;
 
 use super::{FromRawFd, RawFd};
@@ -11,6 +10,7 @@ cfg_if::cfg_if! {
         };
         use linux_syscalls::{syscall, Sysno, Errno};
         use linux_defs::{LockType, SeekWhence, O};
+        use linux_stat::CURRENT_DIRECTORY;
         use super::AsRawFd;
 
         const O_RDONLY: usize = O::RDONLY.bits();
