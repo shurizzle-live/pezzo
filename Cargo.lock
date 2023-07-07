@@ -461,9 +461,9 @@ checksum = "09fc20d2ca12cb9f044c93e3bd6d32d523e6e2ec3db4f7b2939cd99026ecd3f0"
 
 [[package]]
 name = "linux-raw-vdso"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8619a6285fa6021d7ccda74527b1ff676c63d6463c038108b71cca8f6b2a014d"
+checksum = "4357a70ca6b4bde0f0f113225be4cce8ca299f56f3a23d050fc2274bfd4c1411"
 
 [[package]]
 name = "linux-stat"
@@ -478,9 +478,9 @@ dependencies = [
 
 [[package]]
 name = "linux-syscalls"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1b2ea85e2e65abc52a4695a42e942dab9bd43eb7695a2d7bb468a4f188ef131"
+checksum = "a8f0ca8fe1b465bbcf9d130a62032fd5f163d69de6bd2640c0bedb427b259f12"
 dependencies = [
  "cc",
  "cfg-if",
@@ -812,7 +812,7 @@ checksum = "22049a19f4a68748a168c0fc439f9516686aa045927ff767eca0a85101fb6e73"
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://github.com/shurizzle/unix-clock#2a8f3f7fb91956cb2cf943999a55992e3f8c13f0"
+source = "git+https://github.com/shurizzle/unix-clock#98f9d4801b8b018a2822b08d01ed0df3b25c4594"
 dependencies = [
  "apple-errnos",
  "cfg-if",
@@ -823,7 +823,7 @@ dependencies = [
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/unix-clock.git#2a8f3f7fb91956cb2cf943999a55992e3f8c13f0"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#98f9d4801b8b018a2822b08d01ed0df3b25c4594"
 dependencies = [
  "apple-errnos",
  "cfg-if",
