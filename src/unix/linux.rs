@@ -1,10 +1,3 @@
-#[macro_export]
-macro_rules! prefix {
-    ($p:literal) => {
-        $p
-    };
-}
-
 use std::{io, sync::Arc};
 
 use linux_syscalls::{syscall, Sysno};

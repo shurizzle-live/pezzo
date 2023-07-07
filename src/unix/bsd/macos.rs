@@ -7,13 +7,6 @@ use super::{Group, IAMContext, User};
 pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId =
     unix_clock::raw::ClockId::MonotonicRaw;
 
-#[macro_export]
-macro_rules! prefix {
-    ($p:literal) => {
-        concat!("/usr/local", $p)
-    };
-}
-
 impl super::ProcessContext {
     pub fn current(iam: &IAMContext) -> io::Result<Self> {
         let tty_info::ProcessInfo {
