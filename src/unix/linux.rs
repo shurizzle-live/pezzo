@@ -7,6 +7,7 @@ macro_rules! prefix {
 
 use std::{io, sync::Arc};
 
+use linux_syscalls::{syscall, Sysno};
 use tty_info::ProcessInfo;
 
 use super::{
@@ -26,8 +27,8 @@ impl ProcessContext {
             return Err(io::ErrorKind::NotFound.into());
         };
 
-        let uid: u32 = unsafe { libc::getuid() };
-        let gid: u32 = unsafe { libc::getgid() };
+        let uid = unsafe { syscall!([ro] Sysno::getuid).unwrap_unchecked() as u32 };
+        let gid = unsafe { syscall!([ro] Sysno::getgid).unwrap_unchecked() as u32 };
 
         iam.set_effective_identity(uid, gid)?;
 

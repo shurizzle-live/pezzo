@@ -19,18 +19,83 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(
-        target_arch = "x86_64",
-        all(target_arch = "mips", target_pointer_width = "64"),
-        target_arch = "powerpc64",
-        target_arch = "s390x",
-        target_arch = "sparc64"
-    ))] {
+    if #[cfg(any(target_pointer_width = "64", target_arch = "x86_64"))] {
         #[allow(non_upper_case_globals)]
-        const SYS_ppoll: Sysno = Sysno::ppoll;
+        const SYS_ppoll64: Sysno = Sysno::ppoll;
+
+        #[inline(always)]
+        fn poll(pfds: &mut [pollfd_t], timeout: i32) -> Result<usize, Errno> {
+            poll64(pfds, timeout)
+        }
     } else {
         #[allow(non_upper_case_globals)]
-        const SYS_ppoll: Sysno = Sysno::ppoll_time64;
+        const SYS_ppoll64: Sysno = Sysno::ppoll_time64;
+        #[allow(non_upper_case_globals)]
+        const SYS_ppoll32: Sysno = Sysno::ppoll;
+
+        use core::sync::atomic::{AtomicU8, Ordering};
+
+        #[repr(C)]
+        pub struct Timespec32 {
+            secs: i32,
+            nsecs: u32,
+        }
+
+        impl Timespec32 {
+            #[inline]
+            pub fn new(secs: i32, nsecs: u32) -> Self {
+                Self { secs, nsecs }
+            }
+        }
+
+        static mut STATE: AtomicU8 = AtomicU8::new(2);
+
+        #[inline(always)]
+        fn poll32(pfds: &mut [pollfd_t], timeout: i32) -> Result<usize, Errno> {
+            let mut timeout = if timeout > 0 {
+                Some(Timespec32::new(timeout, 0))
+            } else {
+                None
+            };
+
+            loop {
+                match unsafe {
+                    syscall!(
+                        SYS_ppoll64,
+                        pfds.as_mut_ptr(),
+                        pfds.len(),
+                        timeout
+                            .as_mut()
+                            .map(|x| x as *mut Timespec32)
+                            .unwrap_or(core::ptr::null_mut()),
+                        0,
+                        _NSIG / 8
+                    )
+                } {
+                    Ok(0) => return Err(Errno::ETIMEDOUT),
+                    Ok(v) => return Ok(v),
+                    Err(Errno::EINTR) => (),
+                    Err(err) => return Err(err),
+                }
+            }
+        }
+
+        fn poll(pfds: &mut [pollfd_t], timeout: i32) -> Result<usize, Errno> {
+            match unsafe { STATE.load(Ordering::Relaxed) } {
+                0 => poll32(pfds, timeout),
+                1 => poll64(pfds, timeout),
+                _ => match poll64(pfds, timeout) {
+                    Err(Errno::ENOSYS) => {
+                        unsafe { STATE.store(0, Ordering::Relaxed) };
+                        poll32(pfds, timeout)
+                    }
+                    other => {
+                        unsafe { STATE.store(1, Ordering::Relaxed) };
+                        other
+                    }
+                },
+            }
+        }
     }
 }
 
@@ -43,53 +108,42 @@ struct pollfd_t {
 }
 
 #[inline(always)]
-fn poll_read_inf(fd: io::RawFd) -> Result<(), Errno> {
-    let mut pfd = pollfd_t {
-        fd,
-        events: POLLIN,
-        revents: 0,
+fn poll64(pfds: &mut [pollfd_t], timeout: i32) -> Result<usize, Errno> {
+    let mut timeout = if timeout > 0 {
+        Some(Timespec::new(timeout as i64, 0))
+    } else {
+        None
     };
 
     loop {
-        match unsafe { syscall!(SYS_ppoll, &mut pfd as *mut pollfd_t, 1, 0, 0, _NSIG / 8) } {
+        match unsafe {
+            syscall!(
+                SYS_ppoll64,
+                pfds.as_mut_ptr(),
+                pfds.len(),
+                timeout
+                    .as_mut()
+                    .map(|x| x as *mut Timespec)
+                    .unwrap_or(core::ptr::null_mut()),
+                0,
+                _NSIG / 8
+            )
+        } {
             Ok(0) => return Err(Errno::ETIMEDOUT),
-            Ok(_) => return Ok(()),
-            Err(Errno::EAGAIN) | Err(Errno::EINTR) => (),
+            Ok(v) => return Ok(v),
+            Err(Errno::EINTR) => (),
             Err(err) => return Err(err),
         }
     }
 }
 
 pub fn poll_read(fd: io::RawFd, timeout: i32) -> io::Result<()> {
-    let mut timeout = if timeout > 0 {
-        Timespec::new(timeout as i64, 0)
-    } else {
-        return Ok(poll_read_inf(fd)?);
-    };
-
-    let mut pfd = pollfd_t {
+    let mut pfds = [pollfd_t {
         fd,
         events: POLLIN,
         revents: 0,
-    };
+    }];
 
-    loop {
-        match unsafe {
-            syscall!(
-                SYS_ppoll,
-                &mut pfd as *mut pollfd_t,
-                1,
-                (&mut timeout) as *mut Timespec,
-                0,
-                _NSIG / 8
-            )
-        } {
-            Ok(0) => return Err(Errno::ETIMEDOUT.into()),
-            Ok(_) => return Ok(()),
-            Err(Errno::EAGAIN) | Err(Errno::EINTR) => {
-                println!("{:?}", timeout);
-            }
-            Err(err) => return Err(err.into()),
-        }
-    }
+    _ = poll(&mut pfds[..], timeout)?;
+    Ok(())
 }

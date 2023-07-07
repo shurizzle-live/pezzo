@@ -1,18 +1,14 @@
 use crate::io;
-use linux_syscalls::{syscall, Sysno};
+use linux_defs::{FcntlCommand as F, O};
+use linux_syscalls::{syscall, Errno, Sysno};
 
-pub const F_GETFL: core::ffi::c_int = 3;
-pub const F_SETFL: core::ffi::c_int = 4;
-pub const O_NONBLOCK: core::ffi::c_int = 0x800;
-pub const O_LARGEFILE: core::ffi::c_int = 0o100000;
-
-pub struct NonBlockHolder(io::RawFd, core::ffi::c_int);
+pub struct NonBlockHolder(io::RawFd, O);
 
 impl Drop for NonBlockHolder {
     fn drop(&mut self) {
-        if self.1 != 0 {
+        if self.1.bits() == 0 {
             unsafe {
-                _ = syscall!([ro] Sysno::fcntl, self.0, F_SETFL, self.1);
+                _ = syscall!([ro] Sysno::fcntl, self.0, F::SETFL, self.1.bits());
             };
         }
     }
@@ -20,19 +16,30 @@ impl Drop for NonBlockHolder {
 
 pub fn nonblock<R: io::BufRead + io::AsRawFd>(reader: &mut R) -> io::Result<NonBlockHolder> {
     let flags = unsafe {
-        let flags = syscall!(Sysno::fcntl, reader.as_raw_fd(), F_GETFL)?;
-        let flags = core::mem::transmute::<u32, i32>(flags as u32) | O_LARGEFILE;
+        let flags = loop {
+            match syscall!(Sysno::fcntl, reader.as_raw_fd(), F::GETFL) {
+                Err(Errno::EINTR) => (),
+                Err(err) => break Err(err),
+                Ok(f) => break Ok(O::from_bits(f) | O::LARGEFILE),
+            }
+        }?;
+        if !flags.contains(O::NONBLOCK) {
+            loop {
+                match syscall!(
+                    [ro] Sysno::fcntl,
+                    reader.as_raw_fd(),
+                    F::SETFL,
+                    (flags | O::NONBLOCK).bits()
+                ) {
+                    Err(Errno::EINTR) => (),
+                    Err(err) => break Err(err),
+                    Ok(_) => break Ok(()),
+                }
+            }?;
 
-        if flags & O_NONBLOCK == 0 {
-            syscall!(
-                [ro] Sysno::fcntl,
-                reader.as_raw_fd(),
-                F_SETFL,
-                flags | O_NONBLOCK
-            )?;
             flags
         } else {
-            0
+            O::empty()
         }
     };
 

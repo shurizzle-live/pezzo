@@ -437,6 +437,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "linux-defs"
+version = "0.1.0"
+source = "git+https://www.github.com/shurizzle/linux-defs.git#5836534ca6619a803ab443bcae45b95b5cb9a0ee"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "linux-errnos"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -583,6 +591,7 @@ dependencies = [
  "fs4",
  "globset",
  "libc",
+ "linux-defs",
  "linux-stat",
  "linux-syscalls",
  "memchr",
@@ -720,6 +729,7 @@ version = "0.0.1"
 dependencies = [
  "cfg-if",
  "libc",
+ "linux-defs",
  "linux-syscalls",
  "memchr",
  "unix-clock 0.1.0 (git+https://github.com/shurizzle/unix-clock)",
@@ -774,13 +784,14 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#50f9bf2bc29841dcecff053137072e65d19207fe"
+source = "git+https://www.github.com/shurizzle/tty-info.git#beb8593c8b1727652c8fd77546788e9202319062"
 dependencies = [
  "apple-errnos",
  "atoi",
  "bindgen",
  "itoap",
  "libc",
+ "linux-defs",
  "linux-stat",
  "linux-syscalls",
  "memchr",
@@ -801,7 +812,7 @@ checksum = "22049a19f4a68748a168c0fc439f9516686aa045927ff767eca0a85101fb6e73"
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://github.com/shurizzle/unix-clock#7ee6160ac30788ae672d39ffe0897e558efc1de2"
+source = "git+https://github.com/shurizzle/unix-clock#2a8f3f7fb91956cb2cf943999a55992e3f8c13f0"
 dependencies = [
  "apple-errnos",
  "cfg-if",
@@ -812,7 +823,7 @@ dependencies = [
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/unix-clock.git#7ee6160ac30788ae672d39ffe0897e558efc1de2"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#2a8f3f7fb91956cb2cf943999a55992e3f8c13f0"
 dependencies = [
  "apple-errnos",
  "cfg-if",

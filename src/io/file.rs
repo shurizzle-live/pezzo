@@ -10,23 +10,17 @@ cfg_if::cfg_if! {
             os::fd::AsFd,
         };
         use linux_syscalls::{syscall, Sysno, Errno};
+        use linux_defs::{LockType, SeekWhence, O};
         use super::AsRawFd;
 
-        const O_RDONLY: usize = 0o0000000;
-        const O_WRONLY: usize = 0o0000001;
-        const O_RDWR: usize = 0o0000002;
-        const O_APPEND: usize = 0o0002000;
-        const O_CREAT: usize = 0o00000100;
-        const O_TRUNC: usize = 0o00001000;
-        const O_EXCL: usize = 0o00000200;
-        const O_CLOEXEC: usize = 0o2000000;
-
-        const LOCK_SH: usize = 1;
-        const LOCK_EX: usize = 2;
-
-        const SEEK_SET: usize = 0;
-        const SEEK_CUR: usize = 1;
-        const SEEK_END: usize = 2;
+        const O_RDONLY: usize = O::RDONLY.bits();
+        const O_WRONLY: usize = O::WRONLY.bits();
+        const O_RDWR: usize = O::RDWR.bits();
+        const O_APPEND: usize = O::APPEND.bits();
+        const O_CREAT: usize = O::CREAT.bits();
+        const O_TRUNC: usize = O::TRUNC.bits();
+        const O_EXCL: usize = O::EXCL.bits();
+        const O_CLOEXEC: usize = O::CLOEXEC.bits();
 
         pub trait FileExt {
             fn lock_shared(&mut self) -> std::io::Result<()>;
@@ -100,7 +94,7 @@ cfg_if::cfg_if! {
         impl FileExt for File {
             fn lock_shared(&mut self) -> std::io::Result<()> {
                 loop {
-                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LOCK_SH) } {
+                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LockType::Shared) } {
                         Err(Errno::EINTR) => println!("EINTR"),
                         Err(err) => return Err(err.into()),
                         Ok(_) => return Ok(()),
@@ -110,7 +104,7 @@ cfg_if::cfg_if! {
 
             fn lock_exclusive(&mut self) -> std::io::Result<()> {
                 loop {
-                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LOCK_EX) } {
+                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LockType::Exclusive) } {
                         Err(Errno::EINTR) => println!("EINTR"),
                         Err(err) => return Err(err.into()),
                         Ok(_) => return Ok(()),
@@ -121,22 +115,18 @@ cfg_if::cfg_if! {
 
         impl Seek for File {
             fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-                #[inline(always)]
-                unsafe fn lseek<F: AsRawFd>(fd: F, pos: SeekFrom) -> std::io::Result<u64> {
-                    Ok(match pos {
-                        SeekFrom::Start(pos) => syscall!([ro] Sysno::lseek, fd.as_raw_fd(), pos, SEEK_SET),
-                        SeekFrom::Current(pos) => {
-                            syscall!([ro] Sysno::lseek, fd.as_raw_fd(), pos, SEEK_CUR)
-                        }
-                        SeekFrom::End(pos) => syscall!([ro] Sysno::lseek, fd.as_raw_fd(), pos, SEEK_END),
-                    }? as u64)
-                }
+                let fd = self.as_raw_fd();
+                let (pos, whence) = match pos {
+                    SeekFrom::Start(pos) => (pos as usize, SeekWhence::SET as usize),
+                    SeekFrom::Current(pos) => (pos as usize, SeekWhence::CUR as usize),
+                    SeekFrom::End(pos) => (pos as usize, SeekWhence::END as usize),
+                };
 
                 loop {
-                    match unsafe { lseek(self.as_raw_fd(), pos) } {
-                        Err(err) if err.kind() == std::io::ErrorKind::Interrupted => (),
-                        Err(err) => return Err(err),
-                        Ok(prev) => return Ok(prev),
+                    match unsafe { syscall!([ro] Sysno::lseek, fd, pos, whence) } {
+                        Err(Errno::EINTR) => (),
+                        Err(err) => return Err(err.into()),
+                        Ok(prev) => return Ok(prev as u64),
                     }
                 }
             }
@@ -150,10 +140,10 @@ cfg_if::cfg_if! {
 
         pub fn remove_file<P: AsRef<CStr>>(path: P) -> std::io::Result<()> {
             loop {
-                match unsafe { syscall!([ro] Sysno::unlinkat, CURRENT_DIRECTORY, path.as_ref().as_ptr()).map(|_| ()) } {
+                match unsafe { syscall!([ro] Sysno::unlinkat, CURRENT_DIRECTORY, path.as_ref().as_ptr(), 0) } {
                     Err(Errno::EINTR) => (),
                     Err(err) => return Err(err.into()),
-                    Ok(()) => return Ok(()),
+                    Ok(_) => return Ok(()),
                 }
             }
         }

@@ -295,6 +295,7 @@ impl Database {
         buf.push(b'/');
         buf.extend_from_slice(user.as_ref().to_bytes());
         buf.push(0);
+        buf.shrink_to_fit();
         let path = unsafe { CString::from_vec_with_nul_unchecked(buf) };
 
         match io::remove_file(path) {
