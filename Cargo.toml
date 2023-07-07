@@ -29,8 +29,6 @@ unix-clock = { git = "https://www.github.com/shurizzle/unix-clock.git" }
 cfg-if = "1.0.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-atoi = "2.0.0"
-ctor = "0.2.0"
 linux-syscalls = "0.1.3"
 linux-stat = "0.3.1"
 linux-defs = { git = "https://www.github.com/shurizzle/linux-defs.git" }

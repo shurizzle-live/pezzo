@@ -271,16 +271,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eed5fff0d93c7559121e9c72bf9c242295869396255071ff2cb1617147b608c5"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
 name = "cty"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -583,11 +573,9 @@ name = "pezzo"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "atoi",
  "bindgen",
  "cfg-if",
  "clap",
- "ctor",
  "fs4",
  "globset",
  "libc",
