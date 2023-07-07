@@ -1,3 +1,4 @@
+use linux_stat::CURRENT_DIRECTORY;
 use tty_info::CStr;
 
 use super::{FromRawFd, RawFd};
@@ -149,7 +150,7 @@ cfg_if::cfg_if! {
 
         pub fn remove_file<P: AsRef<CStr>>(path: P) -> std::io::Result<()> {
             loop {
-                match unsafe { syscall!([ro] Sysno::unlink, path.as_ref().as_ptr()).map(|_| ()) } {
+                match unsafe { syscall!([ro] Sysno::unlinkat, CURRENT_DIRECTORY, path.as_ref().as_ptr()).map(|_| ()) } {
                     Err(Errno::EINTR) => (),
                     Err(err) => return Err(err.into()),
                     Ok(()) => return Ok(()),
