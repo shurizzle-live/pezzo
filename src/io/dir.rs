@@ -365,10 +365,13 @@ impl DirBuilder {
 
     #[cfg(target_os = "linux")]
     fn mkdir(&self, path: &CStr) -> std::io::Result<()> {
+        use linux_stat::CURRENT_DIRECTORY;
         use linux_syscalls::{syscall, Errno, Sysno};
 
         loop {
-            match unsafe { syscall!([ro] Sysno::mkdir, path.as_ptr(), self.mode) } {
+            match unsafe {
+                syscall!([ro] Sysno::mkdirat, CURRENT_DIRECTORY, path.as_ptr(), self.mode)
+            } {
                 Err(Errno::EINTR) => (),
                 Err(err) => return Err(err.into()),
                 Ok(_) => return Ok(()),
