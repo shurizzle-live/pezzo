@@ -315,7 +315,7 @@ cfg_if::cfg_if! {
                 {
                     loop {
                         match unsafe {
-                            syscall!(Sysno::open, path.as_ptr(), flags, self.mode).map(|fd| fd as RawFd)
+                            syscall!([ro] Sysno::openat, CURRENT_DIRECTORY, path.as_ptr(), flags, self.mode).map(|fd| fd as RawFd)
                         } {
                             Err(Errno::EINTR) => (),
                             Err(err) => return Err(err.into()),
