@@ -1,4 +1,4 @@
-use std::{ffi::CStr, path::PathBuf, sync::Arc};
+use std::{ffi::CStr, path::PathBuf, rc::Rc};
 
 use tty_info::TtyInfo;
 
@@ -61,5 +61,5 @@ pub struct ProcessContext {
     pub original_group: Group,
     pub original_groups: Vec<Group>,
     pub sid: u32,
-    pub tty: Arc<TtyInfo>,
+    pub tty: Rc<TtyInfo>,
 }

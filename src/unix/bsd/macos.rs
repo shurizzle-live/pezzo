@@ -1,6 +1,6 @@
 #![allow(dead_code, non_camel_case_types, unused_assignments)]
 
-use std::{io, sync::Arc};
+use std::{io, rc::Rc};
 
 use super::{Group, IAMContext, User};
 
@@ -56,7 +56,7 @@ impl super::ProcessContext {
             original_group,
             original_groups,
             sid: session,
-            tty: Arc::new(tty),
+            tty: Rc::new(tty),
         })
     }
 }

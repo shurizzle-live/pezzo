@@ -3,6 +3,7 @@
 mod sys;
 
 use std::{
+    cell::RefCell,
     ffi::CStr,
     fmt,
     io::{self, Write},
@@ -10,7 +11,7 @@ use std::{
     mem::{self, MaybeUninit},
     pin::Pin,
     ptr,
-    sync::{Arc, Mutex},
+    rc::Rc,
 };
 
 use super::tty::{TtyIn, TtyOut};
@@ -404,8 +405,8 @@ pub struct PezzoConversation<'a> {
     name: &'a CStr,
     timedout: bool,
     timeout: u32,
-    tty_in: Arc<Mutex<TtyIn>>,
-    tty_out: Arc<Mutex<TtyOut>>,
+    tty_in: Rc<RefCell<TtyIn>>,
+    tty_out: Rc<RefCell<TtyOut>>,
     bell: bool,
 }
 
@@ -424,8 +425,8 @@ impl<'a> PezzoConversation<'a> {
     #[inline]
     pub fn from_values(
         timeout: u32,
-        tty_in: Arc<Mutex<TtyIn>>,
-        tty_out: Arc<Mutex<TtyOut>>,
+        tty_in: Rc<RefCell<TtyIn>>,
+        tty_out: Rc<RefCell<TtyOut>>,
         name: &'a CStr,
         bell: bool,
     ) -> Self {
@@ -482,7 +483,7 @@ impl<'a> PezzoConversation<'a> {
         if prompt_is_password(prompt, self.name) {
             self.print_prompt_password()?;
         } else {
-            let mut out = self.tty_out.lock().expect("tty is poisoned");
+            let mut out = self.tty_out.borrow_mut();
             let mut it = LinesIterator::new(prompt.to_bytes());
             if let Some(mut prev) = it.next() {
                 for mut line in it {
@@ -511,7 +512,7 @@ impl<'a> PezzoConversation<'a> {
 
         let timeout = self.prompt_timeout();
         let buf = {
-            let mut inp = self.tty_in.lock().expect("tty is poisoned");
+            let mut inp = self.tty_in.borrow_mut();
             let line_res = if echo {
                 inp.c_readline(timeout)
             } else {
@@ -520,7 +521,7 @@ impl<'a> PezzoConversation<'a> {
             match line_res {
                 Err(err) => {
                     {
-                        let mut out = self.tty_out.lock().expect("tty is poisoned");
+                        let mut out = self.tty_out.borrow_mut();
                         _ = out.write_all(b"\n");
                         _ = out.flush();
 
@@ -538,7 +539,7 @@ impl<'a> PezzoConversation<'a> {
                             buf.truncate(l)
                         }
                     } else {
-                        let mut out = self.tty_out.lock().expect("tty is poisoned");
+                        let mut out = self.tty_out.borrow_mut();
                         _ = out.write_all(b"\n");
                         _ = out.flush();
                     }
@@ -551,7 +552,7 @@ impl<'a> PezzoConversation<'a> {
     }
 
     fn print_message(&mut self, message: &[u8]) -> ConvResult<()> {
-        let mut out = self.tty_out.lock().expect("tty is poisoned");
+        let mut out = self.tty_out.borrow_mut();
         let mut it = LinesIterator::new(message);
         if let Some(mut prev) = it.next() {
             for mut line in it {
@@ -572,7 +573,7 @@ impl<'a> PezzoConversation<'a> {
     }
 
     pub fn print_prompt_password(&mut self) -> ConvResult<()> {
-        let mut out = self.tty_out.lock().expect("tty is poisoned");
+        let mut out = self.tty_out.borrow_mut();
         out.write_all(b"[pezzo] Password for ")
             .map_err(|_| ConvError::Conversation)?;
         out.write_all(self.name.to_bytes())

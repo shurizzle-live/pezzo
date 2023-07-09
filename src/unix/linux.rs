@@ -1,4 +1,4 @@
-use std::{io, sync::Arc};
+use std::{io, rc::Rc};
 
 use linux_syscalls::{syscall, Sysno};
 use tty_info::ProcessInfo;
@@ -58,7 +58,7 @@ impl ProcessContext {
             original_group,
             original_groups,
             sid: session,
-            tty: Arc::new(tty),
+            tty: Rc::new(tty),
         })
     }
 }

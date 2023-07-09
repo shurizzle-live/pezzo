@@ -2,7 +2,7 @@ use std::{
     fmt,
     io::{BufRead, BufReader, BufWriter, Read, Write},
     os::fd::{AsFd, AsRawFd, RawFd},
-    sync::Arc,
+    rc::Rc,
 };
 
 use super::io::{self, File};
@@ -10,12 +10,12 @@ use super::io::{self, File};
 use tty_info::{CStr, TtyInfo};
 
 pub struct TtyIn {
-    pub(crate) info: Arc<TtyInfo>,
+    pub(crate) info: Rc<TtyInfo>,
     pub(crate) inner: BufReader<File>,
 }
 
 pub struct TtyOut {
-    pub(crate) info: Arc<TtyInfo>,
+    pub(crate) info: Rc<TtyInfo>,
     pub(crate) inner: BufWriter<File>,
 }
 
@@ -66,7 +66,7 @@ impl fmt::Debug for TtyOut {
 }
 
 impl TtyIn {
-    pub fn open(info: Arc<TtyInfo>) -> io::Result<Self> {
+    pub fn open(info: Rc<TtyInfo>) -> io::Result<Self> {
         let inner = BufReader::new(io::OpenOptions::new().read(true).open_cstr(info.path())?);
         Ok(Self { info, inner })
     }
@@ -164,7 +164,7 @@ impl BufRead for TtyIn {
 }
 
 impl TtyOut {
-    pub fn open(info: Arc<TtyInfo>) -> io::Result<Self> {
+    pub fn open(info: Rc<TtyInfo>) -> io::Result<Self> {
         let inner = BufWriter::new(io::OpenOptions::new().write(true).open_cstr(info.path())?);
         Ok(Self { info, inner })
     }

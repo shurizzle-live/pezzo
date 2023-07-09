@@ -6,11 +6,7 @@ pub mod tty;
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
 #[cfg_attr(target_os = "macos", path = "bsd/macos.rs")]
 mod imp;
-use std::{
-    ffi::CStr,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, ffi::CStr, path::Path, rc::Rc};
 use tty_info::Dev;
 
 mod process;
@@ -63,9 +59,9 @@ pub unsafe fn __errno() -> *mut libc::c_int {
 pub struct Context {
     iam: IAMContext,
     proc_ctx: ProcessContext,
-    tty_ctx: Arc<TtyInfo>,
-    tty_in: Arc<Mutex<TtyIn>>,
-    tty_out: Arc<Mutex<TtyOut>>,
+    tty_ctx: Rc<TtyInfo>,
+    tty_in: Rc<RefCell<TtyIn>>,
+    tty_out: Rc<RefCell<TtyOut>>,
     target_user: User,
     target_group: Group,
     bell: bool,
@@ -80,8 +76,8 @@ impl Context {
         bell: bool,
     ) -> io::Result<Self> {
         let tty_ctx = proc_ctx.tty.clone();
-        let tty_in = Arc::new(Mutex::new(TtyIn::open(tty_ctx.clone())?));
-        let tty_out = Arc::new(Mutex::new(TtyOut::open(tty_ctx.clone())?));
+        let tty_in = Rc::new(RefCell::new(TtyIn::open(tty_ctx.clone())?));
+        let tty_out = Rc::new(RefCell::new(TtyOut::open(tty_ctx.clone())?));
 
         Ok(Self {
             iam,
@@ -146,17 +142,17 @@ impl Context {
     }
 
     #[inline]
-    pub fn tty_in(&self) -> Arc<Mutex<TtyIn>> {
+    pub fn tty_in(&self) -> Rc<RefCell<TtyIn>> {
         self.tty_in.clone()
     }
 
     #[inline]
-    pub fn tty_out(&self) -> Arc<Mutex<TtyOut>> {
+    pub fn tty_out(&self) -> Rc<RefCell<TtyOut>> {
         self.tty_out.clone()
     }
 
     #[inline]
-    pub fn tty_inout(&self) -> (Arc<Mutex<TtyIn>>, Arc<Mutex<TtyOut>>) {
+    pub fn tty_inout(&self) -> (Rc<RefCell<TtyIn>>, Rc<RefCell<TtyOut>>) {
         (self.tty_in.clone(), self.tty_out.clone())
     }
 

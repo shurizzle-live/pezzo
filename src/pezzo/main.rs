@@ -6,10 +6,11 @@ use tty_info::Dev;
 use util::*;
 
 use std::{
+    cell::RefCell,
     ffi::{CStr, OsStr, OsString},
     io::Write,
     os::unix::{prelude::OsStrExt, process::CommandExt},
-    sync::{Arc, Mutex},
+    rc::Rc,
 };
 
 use anyhow::{bail, Context, Result};
@@ -101,12 +102,12 @@ fn _main() -> Result<()> {
             proc.tty.device(),
             DEFAULT_SESSION_TIMEOUT,
         )? {
-            let tty_info = Arc::new(
+            let tty_info = Rc::new(
                 tty_info::TtyInfo::by_device(proc.tty.device())
                     .context("Cannot get a valid tty")?,
             );
 
-            let out = Arc::new(Mutex::new(
+            let out = Rc::new(RefCell::new(
                 TtyOut::open(tty_info.clone()).context("Cannot get a valid tty")?,
             ));
 
@@ -115,7 +116,7 @@ fn _main() -> Result<()> {
                 Some(proc.original_user.name()),
                 pezzo::unix::pam::PezzoConversation::from_values(
                     DEFAULT_PROMPT_TIMEOUT,
-                    Arc::new(Mutex::new(
+                    Rc::new(RefCell::new(
                         TtyIn::open(tty_info).context("Cannot get a valid tty")?,
                     )),
                     out.clone(),
@@ -290,7 +291,7 @@ fn is_expired(user_name: &CStr, sid: u32, ttyno: Dev, timeout: u64) -> Result<bo
 fn autenticate(
     auth: &mut pezzo::unix::pam::Authenticator<pezzo::unix::pam::PezzoConversation>,
     max_retries: usize,
-    out: Arc<Mutex<TtyOut>>,
+    out: Rc<RefCell<TtyOut>>,
 ) {
     for i in 1..=max_retries {
         if matches!(auth.authenticate(), Ok(_)) {
@@ -302,7 +303,7 @@ fn autenticate(
         }
 
         {
-            let mut out = out.lock().expect("tty is poisoned");
+            let mut out = out.borrow_mut();
             if i == max_retries {
                 _ = writeln!(out, "pezzo: {} incorrect password attempts", i);
             } else {
