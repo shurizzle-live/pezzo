@@ -463,7 +463,7 @@ checksum = "11b3f875871646a1d9c9efbc401cf63d5b8295e5f18bceca65d46eb7b6ddd2f2"
 dependencies = [
  "cstr_core",
  "cty",
- "linux-syscalls",
+ "linux-syscalls 0.1.4",
 ]
 
 [[package]]
@@ -474,6 +474,19 @@ checksum = "a8f0ca8fe1b465bbcf9d130a62032fd5f163d69de6bd2640c0bedb427b259f12"
 dependencies = [
  "cc",
  "cfg-if",
+ "linux-errnos",
+ "linux-raw-vdso",
+ "linux-sysno",
+ "rustc_version",
+]
+
+[[package]]
+name = "linux-syscalls"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2451ef13e3fa91f5610e6112f6787664ac8d9445385dbdd88bed32f381957f5"
+dependencies = [
+ "cc",
  "linux-errnos",
  "linux-raw-vdso",
  "linux-sysno",
@@ -581,7 +594,7 @@ dependencies = [
  "libc",
  "linux-defs",
  "linux-stat",
- "linux-syscalls",
+ "linux-syscalls 0.2.0",
  "memchr",
  "peg",
  "secure-read",
@@ -608,9 +621,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.63"
+version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b368fba921b0dce7e60f5e04ec15e565b3303972b42bcfde1d0713b881959eb"
+checksum = "78803b62cbf1f46fde80d7c0e803111524b9877184cfe7c3033659490ac7a7da"
 dependencies = [
  "unicode-ident",
 ]
@@ -656,9 +669,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89089e897c013b3deb627116ae56a6955a72b8bed395c9526af31c9fe528b484"
+checksum = "b2eae68fc220f7cf2532e4494aded17545fce192d59cd996e0fe7887f4ceb575"
 dependencies = [
  "aho-corasick 1.0.2",
  "memchr",
@@ -668,9 +681,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa250384981ea14565685dea16a9ccc4d1c541a13f82b9c168572264d1df8c56"
+checksum = "83d3daa6976cffb758ec878f108ba0e062a45b2d6ca3a2cca965338855476caf"
 dependencies = [
  "aho-corasick 1.0.2",
  "memchr",
@@ -718,7 +731,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "linux-defs",
- "linux-syscalls",
+ "linux-syscalls 0.1.4",
  "memchr",
  "unix-clock 0.1.0 (git+https://github.com/shurizzle/unix-clock)",
 ]
@@ -731,9 +744,9 @@ checksum = "bebd363326d05ec3e2f532ab7660680f3b02130d780c299bca73469d521bc0ed"
 
 [[package]]
 name = "serde"
-version = "1.0.167"
+version = "1.0.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7daf513456463b42aa1d94cff7e0c24d682b429f020b9afa4f5ba5c40a22b237"
+checksum = "bd51c3db8f9500d531e6c12dd0fd4ad13d133e9117f5aebac3cdbb8b6d9824b0"
 
 [[package]]
 name = "sha2"
@@ -760,9 +773,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "2.0.23"
+version = "2.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59fb7d6d8281a51045d62b8eb3a7d1ce347b76f312af50cd3dc0af39c87c1737"
+checksum = "36ccaf716a23c35ff908f91c971a86a9a71af5998c1d8f10e828d9f55f68ac00"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -781,7 +794,7 @@ dependencies = [
  "libc",
  "linux-defs",
  "linux-stat",
- "linux-syscalls",
+ "linux-syscalls 0.1.4",
  "memchr",
 ]
 
@@ -805,7 +818,7 @@ dependencies = [
  "apple-errnos",
  "cfg-if",
  "libc",
- "linux-syscalls",
+ "linux-syscalls 0.1.4",
 ]
 
 [[package]]
@@ -816,7 +829,7 @@ dependencies = [
  "apple-errnos",
  "cfg-if",
  "libc",
- "linux-syscalls",
+ "linux-syscalls 0.1.4",
 ]
 
 [[package]]
