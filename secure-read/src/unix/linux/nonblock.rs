@@ -1,14 +1,14 @@
 use crate::io;
-use linux_defs::{FcntlCommand as F, O};
+use linux_raw_sys::general::{F_GETFL, F_SETFL, O_LARGEFILE, O_NONBLOCK};
 use linux_syscalls::{syscall, Errno, Sysno};
 
-pub struct NonBlockHolder(io::RawFd, O);
+pub struct NonBlockHolder(io::RawFd, u32);
 
 impl Drop for NonBlockHolder {
     fn drop(&mut self) {
-        if self.1.bits() == 0 {
+        if self.1 == 0 {
             unsafe {
-                _ = syscall!([ro] Sysno::fcntl, self.0, F::SETFL, self.1.bits());
+                _ = syscall!([ro] Sysno::fcntl, self.0, F_SETFL, self.1);
             };
         }
     }
@@ -17,19 +17,19 @@ impl Drop for NonBlockHolder {
 pub fn nonblock<R: io::BufRead + io::AsRawFd>(reader: &mut R) -> io::Result<NonBlockHolder> {
     let flags = unsafe {
         let flags = loop {
-            match syscall!(Sysno::fcntl, reader.as_raw_fd(), F::GETFL) {
+            match syscall!(Sysno::fcntl, reader.as_raw_fd(), F_GETFL) {
                 Err(Errno::EINTR) => (),
                 Err(err) => break Err(err),
-                Ok(f) => break Ok(O::from_bits(f) | O::LARGEFILE),
+                Ok(f) => break Ok(f as u32 | O_LARGEFILE),
             }
         }?;
-        if !flags.contains(O::NONBLOCK) {
+        if flags & O_NONBLOCK != O_NONBLOCK {
             loop {
                 match syscall!(
                     [ro] Sysno::fcntl,
                     reader.as_raw_fd(),
-                    F::SETFL,
-                    (flags | O::NONBLOCK).bits()
+                    F_SETFL,
+                    flags | O_NONBLOCK
                 ) {
                     Err(Errno::EINTR) => (),
                     Err(err) => break Err(err),
@@ -39,7 +39,7 @@ pub fn nonblock<R: io::BufRead + io::AsRawFd>(reader: &mut R) -> io::Result<NonB
 
             flags
         } else {
-            O::empty()
+            0
         }
     };
 

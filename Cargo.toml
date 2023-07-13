@@ -32,7 +32,7 @@ cfg-if = "1.0.0"
 [target.'cfg(target_os = "linux")'.dependencies]
 linux-syscalls = "0.2.0"
 linux-stat = "0.3.1"
-linux-defs = { git = "https://www.github.com/shurizzle/linux-defs.git" }
+linux-raw-sys = "0.4.3"
 
 [dependencies]
 peg = "0.8.1"

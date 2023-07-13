@@ -23,14 +23,11 @@ impl Default for ExecutableChecker {
 impl Checker for ExecutableChecker {
     #[cfg(target_os = "linux")]
     fn is_valid(&self, path: &CStr) -> bool {
-        use linux_defs::AccessAtFlags;
+        use linux_raw_sys::general::X_OK;
         use linux_stat::CURRENT_DIRECTORY;
         use linux_syscalls::{syscall, Sysno};
 
-        unsafe {
-            syscall!([ro] Sysno::faccessat, CURRENT_DIRECTORY, path.as_ptr(), AccessAtFlags::EXEC.bits())
-        }
-        .is_ok()
+        unsafe { syscall!([ro] Sysno::faccessat, CURRENT_DIRECTORY, path.as_ptr(), X_OK) }.is_ok()
     }
 
     #[cfg(not(target_os = "linux"))]

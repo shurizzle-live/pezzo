@@ -4,12 +4,12 @@ use tty_info::CStr;
 
 #[cfg(target_os = "linux")]
 fn is_file_accessible(file: &CStr) -> bool {
-    use linux_defs::AccessAtFlags;
+    use linux_raw_sys::general::{AT_EACCESS, F_OK};
     use linux_stat::CURRENT_DIRECTORY;
     use linux_syscalls::{syscall, Sysno};
 
     unsafe {
-        syscall!([ro] Sysno::faccessat, CURRENT_DIRECTORY, file.as_ptr(), (AccessAtFlags::EXISTS | AccessAtFlags::EACCESS).bits()).is_ok()
+        syscall!([ro] Sysno::faccessat, CURRENT_DIRECTORY, file.as_ptr(), AT_EACCESS | F_OK).is_ok()
     }
 }
 

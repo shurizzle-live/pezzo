@@ -408,14 +408,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linux-defs"
-version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/linux-defs.git#64e54a154a182721692a4d1881a162d142f12c5c"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "linux-errnos"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -438,27 +430,14 @@ checksum = "4357a70ca6b4bde0f0f113225be4cce8ca299f56f3a23d050fc2274bfd4c1411"
 
 [[package]]
 name = "linux-stat"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11b3f875871646a1d9c9efbc401cf63d5b8295e5f18bceca65d46eb7b6ddd2f2"
+checksum = "e76d911debdcf887b3427c92f55cf77d134f3532e54ea5f75d755073eace5050"
 dependencies = [
  "cstr_core",
  "cty",
- "linux-syscalls 0.1.4",
-]
-
-[[package]]
-name = "linux-syscalls"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8f0ca8fe1b465bbcf9d130a62032fd5f163d69de6bd2640c0bedb427b259f12"
-dependencies = [
- "cc",
- "cfg-if",
- "linux-errnos",
- "linux-raw-vdso",
- "linux-sysno",
- "rustc_version",
+ "linux-raw-sys",
+ "linux-syscalls",
 ]
 
 [[package]]
@@ -572,9 +551,9 @@ dependencies = [
  "clap",
  "globset",
  "libc",
- "linux-defs",
+ "linux-raw-sys",
  "linux-stat",
- "linux-syscalls 0.2.0",
+ "linux-syscalls",
  "memchr",
  "peg",
  "secure-read",
@@ -709,8 +688,8 @@ version = "0.0.1"
 dependencies = [
  "cfg-if",
  "libc",
- "linux-defs",
- "linux-syscalls 0.1.4",
+ "linux-raw-sys",
+ "linux-syscalls",
  "memchr",
  "unix-clock 0.1.0 (git+https://github.com/shurizzle/unix-clock)",
 ]
@@ -764,16 +743,16 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#beb8593c8b1727652c8fd77546788e9202319062"
+source = "git+https://www.github.com/shurizzle/tty-info.git#d1666db3e64c045ead951e93d26f496c22ce8eb3"
 dependencies = [
  "apple-errnos",
  "atoi",
  "bindgen",
  "itoap",
  "libc",
- "linux-defs",
+ "linux-raw-sys",
  "linux-stat",
- "linux-syscalls 0.1.4",
+ "linux-syscalls",
  "memchr",
 ]
 
@@ -792,23 +771,25 @@ checksum = "22049a19f4a68748a168c0fc439f9516686aa045927ff767eca0a85101fb6e73"
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://github.com/shurizzle/unix-clock#98f9d4801b8b018a2822b08d01ed0df3b25c4594"
+source = "git+https://github.com/shurizzle/unix-clock#c377b36488f33e198912c3f40961d661c8028aff"
 dependencies = [
  "apple-errnos",
  "cfg-if",
  "libc",
- "linux-syscalls 0.1.4",
+ "linux-raw-sys",
+ "linux-syscalls",
 ]
 
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/unix-clock.git#98f9d4801b8b018a2822b08d01ed0df3b25c4594"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#c377b36488f33e198912c3f40961d661c8028aff"
 dependencies = [
  "apple-errnos",
  "cfg-if",
  "libc",
- "linux-syscalls 0.1.4",
+ "linux-raw-sys",
+ "linux-syscalls",
 ]
 
 [[package]]

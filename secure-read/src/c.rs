@@ -112,6 +112,14 @@ impl CBuffer {
         }
     }
 
+    pub unsafe fn from_raw_parts(ptr: *mut i8, len: usize, capacity: usize) -> Self {
+        Self {
+            ptr: ptr.cast(),
+            len,
+            capacity,
+        }
+    }
+
     #[inline]
     pub unsafe fn leak(self) -> *mut i8 {
         self.into_raw_parts().0

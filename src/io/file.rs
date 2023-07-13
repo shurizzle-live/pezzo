@@ -15,18 +15,12 @@ cfg_if::cfg_if! {
             os::fd::AsFd,
         };
         use linux_syscalls::{syscall, Sysno, Errno};
-        use linux_defs::{LockType, SeekWhence, O};
         use linux_stat::CURRENT_DIRECTORY;
         use super::AsRawFd;
-
-        const O_RDONLY: usize = O::RDONLY.bits();
-        const O_WRONLY: usize = O::WRONLY.bits();
-        const O_RDWR: usize = O::RDWR.bits();
-        const O_APPEND: usize = O::APPEND.bits();
-        const O_CREAT: usize = O::CREAT.bits();
-        const O_TRUNC: usize = O::TRUNC.bits();
-        const O_EXCL: usize = O::EXCL.bits();
-        const O_CLOEXEC: usize = O::CLOEXEC.bits();
+        use linux_raw_sys::general::{
+            LOCK_EX, LOCK_SH, O_APPEND, O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_TRUNC,
+            O_WRONLY, SEEK_SET, SEEK_CUR, SEEK_END
+        };
 
         pub struct File {
             fd: RawFd,
@@ -94,7 +88,7 @@ cfg_if::cfg_if! {
         impl FileExt for File {
             fn lock_shared(&mut self) -> std::io::Result<()> {
                 loop {
-                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LockType::Shared) } {
+                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LOCK_SH) } {
                         Err(Errno::EINTR) => println!("EINTR"),
                         Err(err) => return Err(err.into()),
                         Ok(_) => return Ok(()),
@@ -104,7 +98,7 @@ cfg_if::cfg_if! {
 
             fn lock_exclusive(&mut self) -> std::io::Result<()> {
                 loop {
-                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LockType::Exclusive) } {
+                    match unsafe { syscall!([ro] Sysno::flock, self.as_raw_fd(), LOCK_EX) } {
                         Err(Errno::EINTR) => println!("EINTR"),
                         Err(err) => return Err(err.into()),
                         Ok(_) => return Ok(()),
@@ -117,9 +111,9 @@ cfg_if::cfg_if! {
             fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
                 let fd = self.as_raw_fd();
                 let (pos, whence) = match pos {
-                    SeekFrom::Start(pos) => (pos as usize, SeekWhence::SET as usize),
-                    SeekFrom::Current(pos) => (pos as usize, SeekWhence::CUR as usize),
-                    SeekFrom::End(pos) => (pos as usize, SeekWhence::END as usize),
+                    SeekFrom::Start(pos) => (pos as usize, SEEK_SET as usize),
+                    SeekFrom::Current(pos) => (pos as usize, SEEK_CUR as usize),
+                    SeekFrom::End(pos) => (pos as usize, SEEK_END as usize),
                 };
 
                 loop {
@@ -156,14 +150,14 @@ cfg_if::cfg_if! {
     if #[cfg(all(unix, not(target_os = "linux")))] {
         use super::AsRawFd;
 
-        const O_RDONLY: usize = libc::O_RDONLY as usize;
-        const O_WRONLY: usize = libc::O_WRONLY as usize;
-        const O_RDWR: usize = libc::O_RDWR as usize;
-        const O_APPEND: usize = libc::O_APPEND as usize;
-        const O_CREAT: usize = libc::O_CREAT as usize;
-        const O_TRUNC: usize = libc::O_TRUNC as usize;
-        const O_EXCL: usize = libc::O_EXCL as usize;
-        const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
+        const O_RDONLY: u32 = libc::O_RDONLY as u32;
+        const O_WRONLY: u32 = libc::O_WRONLY as u32;
+        const O_RDWR: u32 = libc::O_RDWR as u32;
+        const O_APPEND: u32 = libc::O_APPEND as u32;
+        const O_CREAT: u32 = libc::O_CREAT as u32;
+        const O_TRUNC: u32 = libc::O_TRUNC as u32;
+        const O_EXCL: u32 = libc::O_EXCL as u32;
+        const O_CLOEXEC: u32 = libc::O_CLOEXEC as u32;
 
         pub fn remove_file<P: AsRef<CStr>>(path: P) -> std::io::Result<()> {
             loop {
@@ -266,7 +260,7 @@ cfg_if::cfg_if! {
                 self
             }
 
-            fn get_access_mode(&self) -> std::io::Result<usize> {
+            fn get_access_mode(&self) -> std::io::Result<u32> {
                 match (self.read, self.write, self.append) {
                     (true, false, false) => Ok(O_RDONLY),
                     (false, true, false) => Ok(O_WRONLY),
@@ -277,7 +271,7 @@ cfg_if::cfg_if! {
                 }
             }
 
-            fn get_creation_mode(&self) -> std::io::Result<usize> {
+            fn get_creation_mode(&self) -> std::io::Result<u32> {
                 match (self.write, self.append) {
                     (true, false) => (),
                     (false, false) => {
