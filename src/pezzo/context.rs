@@ -1,8 +1,8 @@
 use std::{
     cell::UnsafeCell,
     collections::HashMap,
-    ffi::{CStr, OsString},
-    path::PathBuf,
+    ffi::{CStr, CString, OsStr, OsString},
+    os::unix::prelude::{OsStrExt, OsStringExt},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -43,7 +43,7 @@ impl MatchResult {
 
 #[derive(Debug)]
 pub struct MatchContext {
-    pub(crate) command: PathBuf,
+    pub(crate) command: CString,
     pub(crate) arguments: Vec<OsString>,
     pub(crate) target_user: User,
     pub(crate) target_group: Group,
@@ -62,10 +62,13 @@ impl MatchContext {
         group: Option<Box<CStr>>,
         mut arguments: Vec<OsString>,
     ) -> Result<Self> {
-        let command = arguments.remove(0);
-        let command = if let Ok(command) = which::which(&command) {
-            std::fs::canonicalize(&command)
-                .with_context(move || anyhow!("Cannot resolve path {:?}", command))?
+        let mut command = arguments.remove(0).into_vec();
+        if command.last().map(|&c| c != 0).unwrap_or(true) {
+            command.push(0);
+        }
+        let command = CString::from_vec_with_nul(command)?;
+        let command = if let Ok(command) = pezzo::which::which(&command) {
+            command
         } else {
             bail!("Command {:?} not found", command);
         };
@@ -223,11 +226,9 @@ impl MatchContext {
                 }
             }
 
-            if rule
-                .exe
-                .as_ref()
-                .map_or(true, |exe| exe.is_match(&self.command))
-            {
+            if rule.exe.as_ref().map_or(true, |exe| {
+                exe.is_match(OsStr::from_bytes(self.command.to_bytes()))
+            }) {
                 last = Some(MatchResult {
                     timeout: rule.timeout,
                     askpass: rule.askpass,

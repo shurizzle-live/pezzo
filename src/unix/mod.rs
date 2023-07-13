@@ -2,6 +2,7 @@ mod common;
 mod iam;
 pub mod pam;
 pub mod tty;
+pub mod which;
 #[macro_use]
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
 #[cfg_attr(target_os = "macos", path = "bsd/macos.rs")]

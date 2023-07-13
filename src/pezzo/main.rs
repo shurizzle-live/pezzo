@@ -9,7 +9,10 @@ use std::{
     cell::RefCell,
     ffi::{CStr, OsStr, OsString},
     io::Write,
-    os::unix::{prelude::OsStrExt, process::CommandExt},
+    os::unix::{
+        prelude::{OsStrExt, OsStringExt},
+        process::CommandExt,
+    },
     rc::Rc,
 };
 
@@ -199,8 +202,8 @@ fn _main() -> Result<()> {
             .context("Cannot set euid and egid")?;
     }
 
-    let cmd = command.display().to_string();
-    let mut proc = std::process::Command::new(command);
+    let cmd = OsString::from_vec(command.into_bytes());
+    let mut proc = std::process::Command::new(&cmd);
     proc.args(arguments);
 
     fn set_default_path(proc: &mut std::process::Command) -> &mut std::process::Command {
