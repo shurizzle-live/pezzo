@@ -2,6 +2,12 @@ use tty_info::CStr;
 
 use super::{FromRawFd, RawFd};
 
+pub trait FileExt {
+    fn lock_shared(&mut self) -> std::io::Result<()>;
+
+    fn lock_exclusive(&mut self) -> std::io::Result<()>;
+}
+
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
         use std::{
@@ -21,12 +27,6 @@ cfg_if::cfg_if! {
         const O_TRUNC: usize = O::TRUNC.bits();
         const O_EXCL: usize = O::EXCL.bits();
         const O_CLOEXEC: usize = O::CLOEXEC.bits();
-
-        pub trait FileExt {
-            fn lock_shared(&mut self) -> std::io::Result<()>;
-
-            fn lock_exclusive(&mut self) -> std::io::Result<()>;
-        }
 
         pub struct File {
             fd: RawFd,
@@ -154,7 +154,7 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(all(unix, not(target_os = "linux")))] {
-        pub use fs4::FileExt;
+        use super::AsRawFd;
 
         const O_RDONLY: usize = libc::O_RDONLY as usize;
         const O_WRONLY: usize = libc::O_WRONLY as usize;
@@ -174,6 +174,24 @@ cfg_if::cfg_if! {
                     }
                 } else {
                     return Ok(());
+                }
+            }
+        }
+
+        impl FileExt for File {
+            fn lock_shared(&mut self) -> std::io::Result<()> {
+                if unsafe { libc::flock(self.as_raw_fd(), libc::LOCK_SH) } == -1 {
+                    Err(std::io::Error::last_os_error())
+                } else {
+                    Ok(())
+                }
+            }
+
+            fn lock_exclusive(&mut self) -> std::io::Result<()> {
+                if unsafe { libc::flock(self.as_raw_fd(), libc::LOCK_EX) } == -1 {
+                    Err(std::io::Error::last_os_error())
+                } else {
+                    Ok(())
                 }
             }
         }
