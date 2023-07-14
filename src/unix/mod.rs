@@ -14,7 +14,10 @@ pub mod which;
     ),
     path = "bsd/macos.rs"
 )]
-#[cfg_attr(target_os = "freebsd", path = "bsd/freebsd.rs")]
+#[cfg_attr(
+    any(target_os = "freebsd", target_os = "dragonfly"),
+    path = "bsd/freebsd.rs"
+)]
 mod imp;
 use std::{cell::RefCell, ffi::CStr, path::Path, rc::Rc};
 use tty_info::Dev;
@@ -52,7 +55,7 @@ pub struct Pwd {
     pub gid: u32,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "dragonfly"))]
 #[inline(always)]
 #[doc(hidden)]
 pub unsafe fn __errno() -> *mut libc::c_int {

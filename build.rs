@@ -8,6 +8,7 @@ fn main() {
 enum Os {
     Apple,
     FreeBSD,
+    DragonflyBSD,
     Linux,
 }
 
@@ -21,6 +22,7 @@ fn os() -> Os {
             let os = match os.as_str() {
                 "macos" | "ios" | "watchos" | "tvos" => Os::Apple,
                 "freebsd" => Os::FreeBSD,
+                "dragonfly" => Os::DragonflyBSD,
                 "linux" => Os::Linux,
                 _ => panic!("unsupported OS {os}"),
             };
@@ -32,7 +34,7 @@ fn os() -> Os {
 
 fn default_prefix() -> Vec<u8> {
     match os() {
-        Os::Apple | Os::FreeBSD => b"/usr/local\0".to_vec(),
+        Os::Apple | Os::FreeBSD | Os::DragonflyBSD => b"/usr/local\0".to_vec(),
         Os::Linux => b"\0".to_vec(),
     }
 }
