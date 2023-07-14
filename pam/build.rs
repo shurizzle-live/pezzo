@@ -366,14 +366,14 @@ impl<'a> fmt::Display for SysBindings<'a> {
                     writeln!(f, "pub const {}: i32 = __ORIGINAL_{} as i32;", name, name)?;
                 }
             }
-        }
-        for name in [
-            "PAM_PROMPT_ECHO_OFF",
-            "PAM_PROMPT_ECHO_ON",
-            "PAM_TEXT_INFO",
-            "PAM_ERROR_MSG",
-        ] {
-            writeln!(f, "pub const {}: i32 = __ORIGINAL_{} as i32;", name, name)?;
+            for name in [
+                "PAM_PROMPT_ECHO_OFF",
+                "PAM_PROMPT_ECHO_ON",
+                "PAM_TEXT_INFO",
+                "PAM_ERROR_MSG",
+            ] {
+                writeln!(f, "pub const {}: i32 = __ORIGINAL_{} as i32;", name, name)?;
+            }
         }
         write!(f, "\n}}")
     }
