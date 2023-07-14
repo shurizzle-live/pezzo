@@ -1,60 +1,6 @@
-use std::{
-    env,
-    fs::{self, File},
-    io::BufWriter,
-    path::PathBuf,
-};
-
-use bindgen::callbacks::{IntKind, ParseCallbacks};
-
-#[derive(Debug)]
-struct UseCInt;
-
-impl ParseCallbacks for UseCInt {
-    fn int_macro(&self, _name: &str, _value: i64) -> Option<IntKind> {
-        Some(IntKind::Int)
-    }
-}
+use std::{env, fs::File, io::BufWriter, path::PathBuf};
 
 fn main() {
-    println!("cargo:rustc-link-lib=pam");
-    println!("cargo:rerun-if-changed=build.rs");
-
-    let builder = bindgen::Builder::default()
-        .header_contents("wrapper.h", "#include <security/pam_appl.h>")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks));
-
-    let builder = if cfg!(target_os = "linux") {
-        builder
-            .ctypes_prefix("libc")
-            .parse_callbacks(Box::new(UseCInt))
-    } else if cfg!(target_os = "macos") {
-        builder
-            .raw_line(
-                r#"pub mod c {
-        pub type c_char = ::libc::c_char;
-        pub type c_int = ::libc::c_int;
-        pub type c_uint = ::libc::c_int;
-        pub type c_void = ::libc::c_void;
-    }"#,
-            )
-            .ctypes_prefix("c")
-    } else {
-        builder
-    };
-
-    let bindings = builder.generate().expect("Unable to generate bindings");
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings");
-
-    if !out_path.exists() {
-        fs::create_dir(&out_path).unwrap();
-    }
-
-    bindings
-        .write_to_file(out_path.join("pam.rs"))
-        .expect("Couldn't write bindings!");
-
     prefix();
 }
 
@@ -64,12 +10,21 @@ enum Os {
     Linux,
 }
 
+static mut OS: Option<Os> = None;
 fn os() -> Os {
-    let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
-    match os.as_str() {
-        "macos" | "ios" | "watchos" | "tvos" => Os::Apple,
-        "linux" => Os::Linux,
-        _ => panic!("unsupported OS {os}"),
+    unsafe {
+        if let Some(os) = OS {
+            os
+        } else {
+            let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
+            let os = match os.as_str() {
+                "macos" | "ios" | "watchos" | "tvos" => Os::Apple,
+                "linux" => Os::Linux,
+                _ => panic!("unsupported OS {os}"),
+            };
+            OS = Some(os);
+            os
+        }
     }
 }
 

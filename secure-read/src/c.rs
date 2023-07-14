@@ -306,3 +306,11 @@ impl super::FeedRead for CBuffer {
         }
     }
 }
+
+#[cfg(feature = "pam-compat")]
+impl pam::CBuffer for CBuffer {
+    #[inline]
+    fn leak_c_string(self) -> *mut libc::c_char {
+        CBuffer::leak_c_string(self).cast()
+    }
+}

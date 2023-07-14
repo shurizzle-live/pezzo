@@ -7,9 +7,11 @@ edition = "2021"
 default = ["std"]
 std = ["linux-syscalls/std", "unix-clock/std"]
 c = ["libc", "memchr", "linux-syscalls/libc-compat", "unix-clock/libc-compat"]
+pam-compat = ["pam", "c", "std"]
 
 [target.'cfg(unix)'.dependencies]
 unix-clock = { git = "https://github.com/shurizzle/unix-clock", default-features = false }
+pam = { path = "../pam", optional = true }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 libc = "0.2.144"

@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crypt", "secure-read"]
+members = [".", "crypt", "pam", "secure-read"]
 
 [package]
 name = "pezzo"
@@ -19,7 +19,6 @@ codegen-units = 1
 [features]
 
 [build-dependencies]
-bindgen = "0.66.1"
 memchr = "2.5.0"
 
 [target.'cfg(unix)'.dependencies]
@@ -39,4 +38,5 @@ peg = "0.8.1"
 clap = { version = "4.1.13", features = ["derive"] }
 globset = { version = "0.4.10", features = ["simd-accel"] }
 anyhow = "1.0.70"
-secure-read = { path = "secure-read", features = ["c"] }
+secure-read = { path = "secure-read", features = ["pam-compat"] }
+pam = { path = "pam" }
