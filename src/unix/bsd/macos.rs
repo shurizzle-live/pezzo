@@ -9,13 +9,7 @@ pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId =
 
 impl super::ProcessContext {
     pub fn current(iam: &IAMContext) -> io::Result<Self> {
-        let tty_info::ProcessInfo {
-            pid,
-            uid,
-            gid,
-            session,
-            tty,
-        } = tty_info::ProcessInfo::current()?;
+        let tty_info::ProcessInfo { pid, uid, gid, tty } = tty_info::ProcessInfo::current()?;
 
         let tty = if let Some(tty) = tty {
             tty
@@ -55,7 +49,7 @@ impl super::ProcessContext {
             original_user,
             original_group,
             original_groups,
-            sid: session,
+            sid: unsafe { libc::getsid(pid as _) as _ },
             tty: Rc::new(tty),
         })
     }
