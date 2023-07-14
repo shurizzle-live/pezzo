@@ -7,6 +7,7 @@ fn main() {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Os {
     Apple,
+    FreeBSD,
     Linux,
 }
 
@@ -19,6 +20,7 @@ fn os() -> Os {
             let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
             let os = match os.as_str() {
                 "macos" | "ios" | "watchos" | "tvos" => Os::Apple,
+                "freebsd" => Os::FreeBSD,
                 "linux" => Os::Linux,
                 _ => panic!("unsupported OS {os}"),
             };
@@ -30,7 +32,7 @@ fn os() -> Os {
 
 fn default_prefix() -> Vec<u8> {
     match os() {
-        Os::Apple => b"/usr/local\0".to_vec(),
+        Os::Apple | Os::FreeBSD => b"/usr/local\0".to_vec(),
         Os::Linux => b"\0".to_vec(),
     }
 }

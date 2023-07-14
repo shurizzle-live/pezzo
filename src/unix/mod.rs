@@ -5,7 +5,16 @@ pub mod tty;
 pub mod which;
 #[macro_use]
 #[cfg_attr(target_os = "linux", path = "linux.rs")]
-#[cfg_attr(target_os = "macos", path = "bsd/macos.rs")]
+#[cfg_attr(
+    any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "watchos",
+        target_os = "tvos"
+    ),
+    path = "bsd/macos.rs"
+)]
+#[cfg_attr(target_os = "freebsd", path = "bsd/freebsd.rs")]
 mod imp;
 use std::{cell::RefCell, ffi::CStr, path::Path, rc::Rc};
 use tty_info::Dev;
@@ -50,7 +59,13 @@ pub unsafe fn __errno() -> *mut libc::c_int {
     libc::__errno_location()
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "watchos",
+    target_os = "tvos",
+    target_os = "freebsd"
+))]
 #[inline(always)]
 #[doc(hidden)]
 pub unsafe fn __errno() -> *mut libc::c_int {

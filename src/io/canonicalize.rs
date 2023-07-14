@@ -172,7 +172,12 @@ unsafe fn suffix_requires_dir_check(mut end: *const u8) -> bool {
     false
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "watchos",
+    target_os = "tvos"
+)))]
 unsafe fn dir_check(path: &mut Vec<u8>) -> bool {
     let old_len = path.len();
     path.extend_from_slice(b"/\0");
@@ -181,7 +186,12 @@ unsafe fn dir_check(path: &mut Vec<u8>) -> bool {
     res
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "watchos",
+    target_os = "tvos"
+))]
 unsafe fn dir_check(path: &mut Vec<u8>) -> bool {
     let old_len = path.len();
     path.extend_from_slice(b"/./\0");

@@ -67,12 +67,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
-name = "apple-errnos"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "540d350c054e76f5abacd6d1524a2f89371629db3d75cf32b88a391dda45eb22"
-
-[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -130,6 +124,11 @@ checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
 ]
+
+[[package]]
+name = "bsd-errnos"
+version = "0.1.2"
+source = "git+https://github.com/shurizzle/bsd-errnos.git#3d8589d07d0c2fa5cc8b83492b993cb86c2c6e28"
 
 [[package]]
 name = "bstr"
@@ -802,11 +801,11 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#d1666db3e64c045ead951e93d26f496c22ce8eb3"
+source = "git+https://www.github.com/shurizzle/tty-info.git#273aaadeab4ac4e0459b8e5071b223cb89b0412c"
 dependencies = [
- "apple-errnos",
  "atoi",
  "bindgen",
+ "bsd-errnos",
  "itoap",
  "libc",
  "linux-raw-sys",
@@ -830,9 +829,9 @@ checksum = "22049a19f4a68748a168c0fc439f9516686aa045927ff767eca0a85101fb6e73"
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://github.com/shurizzle/unix-clock#c377b36488f33e198912c3f40961d661c8028aff"
+source = "git+https://github.com/shurizzle/unix-clock#9e6dae84418d664d06150022d71e6a7ac2e211c3"
 dependencies = [
- "apple-errnos",
+ "bsd-errnos",
  "cfg-if",
  "libc",
  "linux-raw-sys",
@@ -842,9 +841,9 @@ dependencies = [
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/unix-clock.git#c377b36488f33e198912c3f40961d661c8028aff"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#9e6dae84418d664d06150022d71e6a7ac2e211c3"
 dependencies = [
- "apple-errnos",
+ "bsd-errnos",
  "cfg-if",
  "libc",
  "linux-raw-sys",

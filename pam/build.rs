@@ -131,6 +131,7 @@ fn main() {
     match os() {
         Os::Linux => main_linux(),
         Os::Apple => main_apple(),
+        Os::FreeBSD => main_freebsd(),
     }
 }
 
@@ -138,6 +139,7 @@ fn main() {
 enum Os {
     Apple,
     Linux,
+    FreeBSD,
 }
 
 static mut OS: Option<Os> = None;
@@ -149,6 +151,7 @@ fn os() -> Os {
             let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
             let os = match os.as_str() {
                 "macos" | "ios" | "watchos" | "tvos" => Os::Apple,
+                "freebsd" => Os::FreeBSD,
                 "linux" => Os::Linux,
                 _ => panic!("unsupported OS {os}"),
             };
@@ -165,6 +168,11 @@ fn main_linux() {
 
 #[inline]
 fn main_apple() {
+    open_pam()
+}
+
+#[inline]
+fn main_freebsd() {
     open_pam()
 }
 
