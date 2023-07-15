@@ -128,7 +128,7 @@ dependencies = [
 [[package]]
 name = "bsd-errnos"
 version = "0.1.2"
-source = "git+https://github.com/shurizzle/bsd-errnos.git#39fc452c838edb344aa3a8ffb349266357df4fe5"
+source = "git+https://github.com/shurizzle/bsd-errnos.git#53726fcd69082d55376eaf18d9aa15364bb6d140"
 
 [[package]]
 name = "bstr"
@@ -789,9 +789,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "2.0.25"
+version = "2.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15e3fc8c0c74267e2df136e5e5fb656a464158aa57624053375eb9c8c6e25ae2"
+checksum = "45c3457aacde3c65315de5031ec191ce46604304d2446e803d71ade03308d970"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -801,7 +801,7 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#fc2555b04a79957b79b4d934e3a6fe6bba8ad658"
+source = "git+https://www.github.com/shurizzle/tty-info.git#eaf9b130a79c42fcd74331646efca176bb658d43"
 dependencies = [
  "atoi",
  "bindgen",
@@ -822,15 +822,16 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.10"
+version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22049a19f4a68748a168c0fc439f9516686aa045927ff767eca0a85101fb6e73"
+checksum = "301abaae475aa91687eb82514b328ab47a211a533026cb25fc3e519b86adfc3c"
 
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://github.com/shurizzle/unix-clock#2813c380aeb4367d385bab5bc2c9ceb528351b64"
+source = "git+https://github.com/shurizzle/unix-clock#9fd5e0bf24847fc5e69cec568e12ad48a41c83f0"
 dependencies = [
+ "bindgen",
  "bsd-errnos",
  "cfg-if",
  "libc",
@@ -841,8 +842,9 @@ dependencies = [
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/unix-clock.git#2813c380aeb4367d385bab5bc2c9ceb528351b64"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#9fd5e0bf24847fc5e69cec568e12ad48a41c83f0"
 dependencies = [
+ "bindgen",
  "bsd-errnos",
  "cfg-if",
  "libc",

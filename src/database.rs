@@ -14,9 +14,9 @@ use tty_info::Dev;
 #[repr(packed)]
 pub struct RawEntry {
     pub session_id: u32,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "netbsd"))]
     pub tty: u64,
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "netbsd")))]
     pub tty: u32,
     pub last_login: u64,
 }

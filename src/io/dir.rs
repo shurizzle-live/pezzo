@@ -356,7 +356,7 @@ impl DirBuilder {
 
     #[cfg(all(unix, not(target_os = "linux")))]
     fn mkdir(&self, path: &CStr) -> std::io::Result<()> {
-        if unsafe { libc::mkdir(path.as_ptr(), self.mode) } == -1 {
+        if unsafe { libc::mkdir(path.as_ptr(), self.mode.into()) } == -1 {
             Err(std::io::Error::last_os_error())
         } else {
             Ok(())

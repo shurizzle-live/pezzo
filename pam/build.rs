@@ -133,6 +133,7 @@ fn main() {
         Os::Apple => main_apple(),
         Os::FreeBSD => main_freebsd(),
         Os::DragonflyBSD => main_dragonfly(),
+        Os::NetBSD => main_netbsd(),
     }
 }
 
@@ -142,6 +143,7 @@ enum Os {
     Linux,
     FreeBSD,
     DragonflyBSD,
+    NetBSD,
 }
 
 static mut OS: Option<Os> = None;
@@ -155,6 +157,7 @@ fn os() -> Os {
                 "macos" | "ios" | "watchos" | "tvos" => Os::Apple,
                 "freebsd" => Os::FreeBSD,
                 "dragonfly" => Os::DragonflyBSD,
+                "netbsd" => Os::NetBSD,
                 "linux" => Os::Linux,
                 _ => panic!("unsupported OS {os}"),
             };
@@ -181,6 +184,11 @@ fn main_freebsd() {
 
 #[inline]
 fn main_dragonfly() {
+    open_pam()
+}
+
+#[inline]
+fn main_netbsd() {
     open_pam()
 }
 

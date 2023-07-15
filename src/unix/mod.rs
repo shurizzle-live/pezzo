@@ -18,6 +18,7 @@ pub mod which;
     any(target_os = "freebsd", target_os = "dragonfly"),
     path = "bsd/freebsd.rs"
 )]
+#[cfg_attr(target_os = "netbsd", path = "bsd/netbsd.rs")]
 mod imp;
 use std::{cell::RefCell, ffi::CStr, path::Path, rc::Rc};
 use tty_info::Dev;
@@ -56,11 +57,8 @@ pub struct Pwd {
 }
 
 #[cfg(any(target_os = "linux", target_os = "dragonfly"))]
-#[inline(always)]
 #[doc(hidden)]
-pub unsafe fn __errno() -> *mut libc::c_int {
-    libc::__errno_location()
-}
+pub use libc::__errno_location as __errno;
 
 #[cfg(any(
     target_os = "macos",
@@ -69,11 +67,12 @@ pub unsafe fn __errno() -> *mut libc::c_int {
     target_os = "tvos",
     target_os = "freebsd"
 ))]
-#[inline(always)]
 #[doc(hidden)]
-pub unsafe fn __errno() -> *mut libc::c_int {
-    libc::__error()
-}
+pub use libc::__error as __errno;
+
+#[cfg(target_os = "netbsd")]
+#[doc(hidden)]
+pub use libc::__errno;
 
 pub struct Context {
     iam: IAMContext,
