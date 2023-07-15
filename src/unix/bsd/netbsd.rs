@@ -2,7 +2,10 @@ use std::io;
 
 use tty_info::TtyInfo;
 
+#[cfg(target_os = "netbsd")]
 pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId = unix_clock::raw::ClockId::Monotonic;
+#[cfg(target_os = "openbsd")]
+pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId = unix_clock::raw::ClockId::Boottime;
 
 #[inline(always)]
 pub(crate) fn process_infos() -> io::Result<(u32, u32, u32, u32, Option<TtyInfo>)> {

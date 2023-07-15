@@ -128,7 +128,7 @@ dependencies = [
 [[package]]
 name = "bsd-errnos"
 version = "0.1.2"
-source = "git+https://github.com/shurizzle/bsd-errnos.git#53726fcd69082d55376eaf18d9aa15364bb6d140"
+source = "git+https://github.com/shurizzle/bsd-errnos.git#6abb39024a117eb1159ee0dc46e7bed62b6f1baf"
 
 [[package]]
 name = "bstr"
@@ -801,7 +801,7 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#ad6a17ccf53ae81e4fc3540cb41ab56b6cbd4c44"
+source = "git+https://www.github.com/shurizzle/tty-info.git#10d526c4691312e0554c9d96e6860eb721152193"
 dependencies = [
  "atoi",
  "bindgen",
@@ -829,7 +829,7 @@ checksum = "301abaae475aa91687eb82514b328ab47a211a533026cb25fc3e519b86adfc3c"
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://github.com/shurizzle/unix-clock#9fd5e0bf24847fc5e69cec568e12ad48a41c83f0"
+source = "git+https://github.com/shurizzle/unix-clock#8f0aadf456c51895372d5eae2a5eca59df48a7eb"
 dependencies = [
  "bindgen",
  "bsd-errnos",
@@ -842,7 +842,7 @@ dependencies = [
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/unix-clock.git#9fd5e0bf24847fc5e69cec568e12ad48a41c83f0"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#8f0aadf456c51895372d5eae2a5eca59df48a7eb"
 dependencies = [
  "bindgen",
  "bsd-errnos",

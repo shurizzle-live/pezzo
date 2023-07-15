@@ -18,7 +18,10 @@ pub mod which;
     any(target_os = "freebsd", target_os = "dragonfly"),
     path = "bsd/freebsd.rs"
 )]
-#[cfg_attr(target_os = "netbsd", path = "bsd/netbsd.rs")]
+#[cfg_attr(
+    any(target_os = "netbsd", target_os = "openbsd"),
+    path = "bsd/netbsd.rs"
+)]
 mod imp;
 use std::{cell::RefCell, ffi::CStr, path::Path, rc::Rc};
 use tty_info::Dev;
@@ -70,7 +73,7 @@ pub use libc::__errno_location as __errno;
 #[doc(hidden)]
 pub use libc::__error as __errno;
 
-#[cfg(target_os = "netbsd")]
+#[cfg(any(target_os = "netbsd", target_os = "openbsd"))]
 #[doc(hidden)]
 pub use libc::__errno;
 

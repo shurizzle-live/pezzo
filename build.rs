@@ -10,6 +10,7 @@ enum Os {
     FreeBSD,
     DragonflyBSD,
     NetBSD,
+    OpenBSD,
     Linux,
 }
 
@@ -25,6 +26,7 @@ fn os() -> Os {
                 "freebsd" => Os::FreeBSD,
                 "dragonfly" => Os::DragonflyBSD,
                 "netbsd" => Os::NetBSD,
+                "openbsd" => Os::OpenBSD,
                 "linux" => Os::Linux,
                 _ => panic!("unsupported OS {os}"),
             };
@@ -38,6 +40,7 @@ fn default_prefix() -> Vec<u8> {
     match os() {
         Os::Apple | Os::FreeBSD | Os::DragonflyBSD => b"/usr/local\0".to_vec(),
         Os::NetBSD => b"/usr/pkg\0".to_vec(),
+        Os::OpenBSD => b"\0".to_vec(),
         Os::Linux => b"\0".to_vec(),
     }
 }
