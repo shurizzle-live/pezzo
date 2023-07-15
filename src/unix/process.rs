@@ -1,6 +1,8 @@
-use std::{ffi::CStr, path::PathBuf, rc::Rc};
+use std::{ffi::CStr, io, path::PathBuf, rc::Rc};
 
 use tty_info::TtyInfo;
+
+use super::IAMContext;
 
 #[derive(Debug, Clone)]
 pub struct User {
@@ -62,4 +64,54 @@ pub struct ProcessContext {
     pub original_groups: Vec<Group>,
     pub sid: u32,
     pub tty: Rc<TtyInfo>,
+}
+
+impl ProcessContext {
+    pub fn current(iam: &IAMContext) -> io::Result<Self> {
+        let (pid, uid, gid, session, tty) = super::process_infos()?;
+
+        let tty = if let Some(tty) = tty {
+            tty
+        } else {
+            return Err(io::ErrorKind::NotFound.into());
+        };
+
+        iam.set_effective_identity(uid, gid)?;
+
+        let exe = std::fs::canonicalize(std::env::current_exe()?)?;
+
+        let user_name = if let Some(user_name) = iam.user_name_by_id(uid)? {
+            user_name
+        } else {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "invalid user"));
+        };
+
+        let group_name = if let Some(group_name) = iam.group_name_by_id(gid)? {
+            group_name
+        } else {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "invalid group"));
+        };
+
+        let original_user = User {
+            name: user_name,
+            id: uid,
+        };
+
+        let original_group = Group {
+            name: group_name,
+            id: gid,
+        };
+
+        let original_groups = iam.get_groups(original_user.name())?;
+
+        Ok(Self {
+            exe,
+            pid,
+            original_user,
+            original_group,
+            original_groups,
+            sid: session,
+            tty: Rc::new(tty),
+        })
+    }
 }
