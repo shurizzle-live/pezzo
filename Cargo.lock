@@ -801,7 +801,7 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#ff02b729c7ff80007334e395ef38b65e3dc2c465"
+source = "git+https://www.github.com/shurizzle/tty-info.git#ad6a17ccf53ae81e4fc3540cb41ab56b6cbd4c44"
 dependencies = [
  "atoi",
  "bindgen",
