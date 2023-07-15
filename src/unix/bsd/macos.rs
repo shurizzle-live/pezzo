@@ -1,6 +1,6 @@
-use std::{io, rc::Rc};
+use std::io;
 
-use super::{Group, IAMContext, User};
+use tty_info::TtyInfo;
 
 pub(crate) const BOOTTIME_CLOCKID: unix_clock::raw::ClockId =
     unix_clock::raw::ClockId::MonotonicRaw;
