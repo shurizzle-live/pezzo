@@ -1,8 +1,7 @@
+use crate::ffi::CString;
+use alloc_crate::{boxed::Box, rc::Rc, vec::Vec};
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
-use std::{
-    ffi::{CString, OsStr, OsString},
-    rc::Rc,
-};
+use std::ffi::{OsStr, OsString};
 
 #[derive(Debug, Clone)]
 pub enum Origin {
@@ -251,7 +250,8 @@ impl Builder {
 
 peg::parser! {
     grammar config() for [u8] {
-        use std::ffi::CString;
+        use pezzo::ffi::CString;
+        use alloc_crate::vec::Vec;
 
         rule ws() = quiet!{[b' ' | b'\n' | b'\t']+}
         rule eof() = quiet!{![_]}
@@ -316,7 +316,7 @@ peg::parser! {
 
         rule var_name_() -> OsString
             = name:$([b'A'..=b'Z' | b'a'..=b'z' | b'_'][b'A'..=b'Z' | b'a'..=b'z' | b'_' | b'0'..=b'9']*) {
-                OsString::from(unsafe { std::str::from_utf8_unchecked(name) }.to_string())
+                OsString::from(unsafe { core::str::from_utf8_unchecked(name) }.to_string())
             }
         rule var_name() -> Rc<Box<OsStr>>
             = name:var_name_() { Rc::new(name.into_boxed_os_str()) }
@@ -368,7 +368,7 @@ peg::parser! {
 
         rule u64_literal() -> u64
             = i:$(([b'1'..=b'9'][b'0'..=b'9']*) / [b'0']) {?
-                std::str::from_utf8(i)
+                core::str::from_utf8(i)
                     .map_err(|_| "invalid integer")?
                     .parse::<u64>()
                     .map_err(|_| "invalid integer")
@@ -381,7 +381,7 @@ peg::parser! {
         rule exe() -> Glob
             = name:(exe_char()+) {?
                 GlobBuilder::new(
-                        std::str::from_utf8(name.as_slice())
+                        core::str::from_utf8(name.as_slice())
                             .map_err(|_| "invalid utf8")?)
                     .literal_separator(true)
                     .build()

@@ -1,3 +1,6 @@
+#![no_main]
+
+mod cli;
 mod context;
 mod util;
 
@@ -256,9 +259,9 @@ fn _main() -> Result<()> {
     Ok(())
 }
 
-fn main() {
-    #[cfg(target_os = "linux")]
-    linux_syscalls::init();
+#[no_mangle]
+fn main(argc: isize, argv: *const *const u8, envp: *const *const u8) {
+    unsafe { pezzo::env::init(argc, argv, envp) };
 
     if let Err(err) = _main() {
         eprintln!("{:?}", err);

@@ -1,9 +1,9 @@
-use std::ffi::{CStr, CString};
+use crate::ffi::{CStr, CString};
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
         pub fn hostname() -> CString {
-            unsafe { CStr::from_ptr(linux_syscalls::env::uname().domainname.as_ptr().cast()).into() }
+            unsafe { CStr::from_ptr(linux_syscalls::env::unchecked_uname().domainname.as_ptr().cast()).into() }
         }
     } else {
         use crate::unix::__errno;

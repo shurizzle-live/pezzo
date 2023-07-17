@@ -1,6 +1,5 @@
-use std::ffi::CString;
-
-use tty_info::CStr;
+use crate::ffi::{CStr, CString};
+use alloc_crate::vec::Vec;
 
 #[cfg(target_os = "linux")]
 fn is_file_accessible(file: &CStr) -> bool {
@@ -33,7 +32,7 @@ struct State {
 }
 
 #[cfg(target_os = "linux")]
-fn getcwd(buf: &mut Vec<u8>) -> std::io::Result<()> {
+fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
     use linux_stat::Errno;
     use linux_syscalls::{syscall, Sysno};
 
@@ -60,7 +59,7 @@ fn getcwd(buf: &mut Vec<u8>) -> std::io::Result<()> {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn getcwd(buf: &mut Vec<u8>) -> std::io::Result<()> {
+fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
     use crate::unix::__errno;
 
     if buf.capacity() == 0 {
@@ -74,7 +73,7 @@ fn getcwd(buf: &mut Vec<u8>) -> std::io::Result<()> {
             let err = *__errno();
 
             if err != libc::ERANGE {
-                return Err(std::io::Error::from_raw_os_error(err));
+                return Err(crate::io::from_raw_os_error(err));
             }
 
             buf.reserve(buf.capacity().max(1) * 2);
@@ -85,7 +84,7 @@ fn getcwd(buf: &mut Vec<u8>) -> std::io::Result<()> {
 }
 
 #[cfg(target_os = "linux")]
-fn readlink(path: &CStr, buf: &mut Vec<u8>) -> std::io::Result<()> {
+fn read_link_in(path: &CStr, buf: &mut Vec<u8>) -> crate::io::Result<()> {
     use linux_stat::CURRENT_DIRECTORY;
     use linux_syscalls::{syscall, Sysno};
 
@@ -115,7 +114,7 @@ fn readlink(path: &CStr, buf: &mut Vec<u8>) -> std::io::Result<()> {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn readlink(path: &CStr, buf: &mut Vec<u8>) -> std::io::Result<()> {
+fn read_link_in(path: &CStr, buf: &mut Vec<u8>) -> crate::io::Result<()> {
     use crate::unix::__errno;
 
     if buf.capacity() == 0 {
@@ -131,7 +130,7 @@ fn readlink(path: &CStr, buf: &mut Vec<u8>) -> std::io::Result<()> {
                 buf.as_mut_ptr().cast(),
                 buf.capacity(),
             ) {
-                -1 if *__errno() != libc::EFAULT => return Err(std::io::Error::last_os_error()),
+                -1 if *__errno() != libc::EFAULT => return Err(core::io::last_os_error()),
                 -1 => (),
                 len if (len as usize) < buf.capacity() - 1 => {
                     buf.set_len(len as usize);
@@ -141,6 +140,12 @@ fn readlink(path: &CStr, buf: &mut Vec<u8>) -> std::io::Result<()> {
             }
         }
     }
+}
+
+pub fn read_link<P: AsRef<CStr>>(path: &CStr) -> crate::io::Result<CString> {
+    let mut buf = Vec::new();
+    read_link_in(path.as_ref(), &mut buf)?;
+    Ok(unsafe { CString::from_vec_unchecked(buf) })
 }
 
 unsafe fn skip_slashes(mut ptr: *const u8) -> *const u8 {
@@ -202,14 +207,17 @@ unsafe fn dir_check(path: &mut Vec<u8>) -> bool {
 
 #[cfg(target_os = "linux")]
 #[inline(always)]
-fn eloop() -> std::io::Error {
+fn eloop() -> crate::io::Error {
     linux_stat::Errno::ELOOP.into()
 }
 
 #[cfg(not(target_os = "linux"))]
 #[inline(always)]
-fn eloop() -> std::io::Error {
-    std::io::Error::from_raw_os_error(libc::ELOOP)
+fn eloop() -> crate::io::Error {
+    crate::io::Error::new(
+        crate::io::ErrorKind::Other,
+        "Too many symbolic links encountered",
+    )
 }
 
 #[inline(always)]
@@ -217,11 +225,11 @@ fn __eloop_threshold() -> usize {
     40
 }
 
-pub fn realpath<P: AsRef<CStr>>(name: P) -> std::io::Result<CString> {
+pub fn realpath<P: AsRef<CStr>>(name: P) -> crate::io::Result<CString> {
     let name = name.as_ref().to_bytes_with_nul();
 
     if name.len() == 1 {
-        return Err(std::io::ErrorKind::NotFound.into());
+        return Err(crate::io::ErrorKind::NotFound.into());
     }
 
     let mut state = State::default();
@@ -273,7 +281,7 @@ pub fn realpath<P: AsRef<CStr>>(name: P) -> std::io::Result<CString> {
                 }
                 {
                     let path = CStr::from_ptr(state.rname.as_ptr().cast());
-                    if let Err(err) = readlink(
+                    if let Err(err) = read_link_in(
                         path,
                         if extra {
                             &mut state.link
@@ -284,7 +292,7 @@ pub fn realpath<P: AsRef<CStr>>(name: P) -> std::io::Result<CString> {
                         let error = if suffix_requires_dir_check(end) {
                             !dir_check(&mut state.rname)
                         } else {
-                            if err.kind() == std::io::ErrorKind::InvalidInput {
+                            if err.kind() == crate::io::ErrorKind::InvalidInput {
                                 start = end;
                                 continue;
                             }
@@ -335,22 +343,9 @@ pub fn realpath<P: AsRef<CStr>>(name: P) -> std::io::Result<CString> {
         }
     }
 
-    if state.rname.last().map(|&c| c != 0).unwrap_or(true) {
-        'set_null: {
-            if state.rname.len() > 1 {
-                unsafe {
-                    let last = state.rname.len() - 1;
-                    let c = state.rname.get_unchecked_mut(last);
-                    if *c == b'/' {
-                        *c = 0;
-                        break 'set_null;
-                    }
-                }
-            }
-            state.rname.push(0);
-        }
+    if state.rname.last().map(|&c| c == 0).unwrap_or(false) {
+        unsafe { state.rname.set_len(state.rname.len() - 1) };
     }
-    state.rname.shrink_to_fit();
 
-    Ok(unsafe { CString::from_vec_with_nul_unchecked(state.rname) })
+    Ok(unsafe { CString::from_vec_unchecked(state.rname) })
 }

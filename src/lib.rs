@@ -1,13 +1,18 @@
-use std::ffi::CStr;
+#![no_std]
+
+#[macro_use]
+extern crate alloc as alloc_crate;
+
+use crate::ffi::CStr;
 
 pub mod conf;
 pub mod database;
-pub mod io;
+pub mod ffi;
 #[cfg(unix)]
 pub mod unix;
 pub mod util;
 #[cfg(unix)]
-pub use unix::which;
+pub use unix::{__errno, env, io, which};
 
 pub const DEFAULT_PROMPT_TIMEOUT: u32 = 300;
 pub const PEZZO_NAME_CSTR: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"pezzo\0") };

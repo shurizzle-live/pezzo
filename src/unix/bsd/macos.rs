@@ -1,4 +1,4 @@
-use std::io;
+use crate::io;
 
 use tty_info::TtyInfo;
 

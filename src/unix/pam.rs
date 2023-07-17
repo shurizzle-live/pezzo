@@ -1,10 +1,7 @@
-use std::{
-    cell::RefCell,
-    ffi::CStr,
-    io::{self, Write},
-    mem::{self},
-    rc::Rc,
-};
+use crate::ffi::CStr;
+use crate::io::{self, Write};
+use alloc_crate::rc::Rc;
+use core::{cell::RefCell, mem};
 
 pub use pam::Pam as Authenticator;
 pub use pam::*;

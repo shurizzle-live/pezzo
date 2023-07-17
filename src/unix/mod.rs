@@ -1,5 +1,7 @@
 mod common;
+pub mod env;
 mod iam;
+pub mod io;
 pub mod pam;
 pub mod tty;
 pub mod which;
@@ -23,7 +25,9 @@ pub mod which;
     path = "bsd/netbsd.rs"
 )]
 mod imp;
-use std::{cell::RefCell, ffi::CStr, path::Path, rc::Rc};
+use crate::ffi::CStr;
+use alloc_crate::{boxed::Box, rc::Rc, vec::Vec};
+use core::cell::RefCell;
 use tty_info::Dev;
 
 mod process;
@@ -36,7 +40,7 @@ pub use iam::IAMContext;
 pub use process::*;
 use tty_info::TtyInfo;
 
-use crate::{io, DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_NAME_CSTR};
+use crate::{DEFAULT_MAX_RETRIES, DEFAULT_PROMPT_TIMEOUT, PEZZO_NAME_CSTR};
 
 use self::tty::{TtyIn, TtyOut};
 
@@ -113,7 +117,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn exe(&self) -> &Path {
+    pub fn exe(&self) -> &CStr {
         &self.proc_ctx.exe
     }
 

@@ -7,7 +7,6 @@ use crate::io;
 
 use linux_syscalls::{syscall, Errno, Sysno};
 
-// const MAX_TIMEOUT: u32 = core::ffi::c_int::MAX as u32 / 2;
 const POLLIN: core::ffi::c_short = 1;
 
 cfg_if! {

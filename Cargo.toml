@@ -24,24 +24,34 @@ memchr = "2.5.0"
 [target.'cfg(unix)'.dependencies]
 memchr = "2.5.0"
 libc = "0.2.140"
-tty-info = { git = "https://www.github.com/shurizzle/tty-info.git" }
-unix-clock = { git = "https://www.github.com/shurizzle/unix-clock.git" }
+tty-info = { git = "https://www.github.com/shurizzle/tty-info.git", default-features = false }
+unix-clock = { git = "https://www.github.com/shurizzle/unix-clock.git", default-features = false }
 cfg-if = "1.0.0"
+no_std_io = { version = "0.6.0", default-features = false, features = [
+  "alloc",
+] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-linux-syscalls = "0.2.0"
-linux-stat = "0.3.1"
+linux-syscalls = { version = "0.2.0", default-features = false, features = [
+  "bare",
+] }
+linux-stat = { version = "0.3.1", default-features = false }
 linux-raw-sys = "0.4.3"
 
 [target.'cfg(all(unix, not(target_os = "openbsd")))'.dependencies]
 pam = { path = "pam" }
-secure-read = { path = "secure-read", features = ["pam-compat"] }
+secure-read = { path = "secure-read", default-features = false, features = [
+  "pam-compat",
+] }
 
 [target.'cfg(target_os = "openbsd")'.dependencies]
-secure-read = { path = "secure-read" }
+secure-read = { path = "secure-read", default-features = false }
 
 [dependencies]
 peg = "0.8.1"
 clap = { version = "4.1.13", features = ["derive"] }
 globset = { version = "0.4.10", features = ["simd-accel"] }
 anyhow = "1.0.70"
+
+[patch.crates-io]
+no_std_io = { git = "https://github.com/shurizzle/no-std-io.git" }

@@ -1,13 +1,14 @@
-use std::{
-    fmt,
-    io::{BufRead, BufReader, BufWriter, Read, Write},
-    os::fd::{AsFd, AsRawFd, RawFd},
-    rc::Rc,
+use crate::{
+    ffi::CStr,
+    io::{AsRawFd, BufRead, BufReader, BufWriter, RawFd, Read, Write},
 };
+
+use alloc_crate::{rc::Rc, vec::Vec};
+use core::fmt;
 
 use super::io::{self, File};
 
-use tty_info::{CStr, TtyInfo};
+use tty_info::TtyInfo;
 
 pub struct TtyIn {
     pub(crate) info: Rc<TtyInfo>,
@@ -99,36 +100,19 @@ impl AsRawFd for TtyIn {
     }
 }
 
-impl AsFd for TtyIn {
-    #[inline]
-    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
-        self.inner.get_ref().as_fd()
-    }
-}
-
 impl Read for TtyIn {
     #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
         self.inner.read(buf)
     }
 
     #[inline]
-    fn read_vectored(&mut self, bufs: &mut [std::io::IoSliceMut<'_>]) -> std::io::Result<usize> {
-        self.inner.read_vectored(bufs)
-    }
-
-    #[inline]
-    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> crate::io::Result<usize> {
         self.inner.read_to_end(buf)
     }
 
     #[inline]
-    fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<usize> {
-        self.inner.read_to_string(buf)
-    }
-
-    #[inline]
-    fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
+    fn read_exact(&mut self, buf: &mut [u8]) -> crate::io::Result<()> {
         self.inner.read_exact(buf)
     }
 
@@ -143,23 +127,13 @@ impl Read for TtyIn {
 
 impl BufRead for TtyIn {
     #[inline]
-    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+    fn fill_buf(&mut self) -> crate::io::Result<&[u8]> {
         self.inner.fill_buf()
     }
 
     #[inline]
     fn consume(&mut self, amt: usize) {
         self.inner.consume(amt)
-    }
-
-    #[inline]
-    fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> std::io::Result<usize> {
-        self.inner.read_until(byte, buf)
-    }
-
-    #[inline]
-    fn read_line(&mut self, buf: &mut String) -> std::io::Result<usize> {
-        self.inner.read_line(buf)
     }
 }
 
@@ -187,13 +161,6 @@ impl AsRawFd for TtyOut {
     }
 }
 
-impl AsFd for TtyOut {
-    #[inline]
-    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
-        self.inner.get_ref().as_fd()
-    }
-}
-
 impl Write for TtyOut {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -206,17 +173,12 @@ impl Write for TtyOut {
     }
 
     #[inline]
-    fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.write_vectored(bufs)
-    }
-
-    #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         self.inner.write_all(buf)
     }
 
     #[inline]
-    fn write_fmt(&mut self, fmt: std::fmt::Arguments<'_>) -> io::Result<()> {
+    fn write_fmt(&mut self, fmt: core::fmt::Arguments<'_>) -> io::Result<()> {
         self.inner.write_fmt(fmt)
     }
 
@@ -238,7 +200,7 @@ impl Drop for TtyIn {
         self.inner.consume(max_len);
         while {
             match self.inner.fill_buf() {
-                Err(err) if err.kind() == std::io::ErrorKind::Interrupted => true,
+                Err(err) if err.kind() == io::ErrorKind::Interrupted => true,
                 Err(_) => false,
                 Ok(_) => {
                     let l = self.inner.buffer().len();
@@ -249,7 +211,9 @@ impl Drop for TtyIn {
             }
         } {}
 
-        unsafe { std::slice::from_raw_parts_mut(self.inner.buffer().as_ptr() as *mut u8, max_len) }
-            .fill(0);
+        unsafe {
+            core::slice::from_raw_parts_mut(self.inner.buffer().as_ptr() as *mut u8, max_len)
+        }
+        .fill(0);
     }
 }

@@ -1,4 +1,5 @@
-use std::ffi::CStr;
+use alloc_crate::{boxed::Box, vec::Vec};
+use core::ffi::CStr;
 
 pub trait Checker {
     fn is_valid(&self, path: &CStr) -> bool;

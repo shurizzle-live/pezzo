@@ -1,6 +1,12 @@
-use std::{ffi::CStr, io};
+use crate::{ffi::CStr, io};
+use alloc_crate::{borrow::ToOwned, boxed::Box, vec::Vec};
 
 use super::{Group, Pwd, User, __errno};
+
+#[inline]
+fn box_c_str(ptr: *mut i8) -> Box<CStr> {
+    unsafe { CStr::from_ptr(ptr.cast()).to_owned().into_boxed_c_str() }
+}
 
 #[derive(Debug)]
 pub struct IAMContext;
@@ -10,7 +16,7 @@ impl IAMContext {
     pub fn new() -> io::Result<Self> {
         unsafe {
             if libc::initgroups(b"root\0".as_ptr() as *const _, 0) == -1 {
-                return Err(io::Error::last_os_error());
+                return Err(io::last_os_error());
             }
         }
         Ok(Self)
@@ -25,8 +31,8 @@ impl IAMContext {
         unsafe {
             let uid = (*raw).pw_uid;
             let gid = (*raw).pw_gid;
-            let name = CStr::from_ptr((*raw).pw_name).to_owned().into_boxed_c_str();
-            let home = CStr::from_ptr((*raw).pw_dir).to_owned().into_boxed_c_str();
+            let name = box_c_str((*raw).pw_name);
+            let home = box_c_str((*raw).pw_dir);
 
             Pwd {
                 uid,
@@ -47,7 +53,7 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::Error::last_os_error())
+                    Err(io::last_os_error())
                 }
             } else {
                 Ok(Some(pwd))
@@ -63,7 +69,7 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::Error::last_os_error())
+                    Err(io::last_os_error())
                 }
             } else {
                 Ok(Some(pwd))
@@ -88,31 +94,18 @@ impl IAMContext {
         &self,
         name: S,
     ) -> io::Result<Option<(u32, Box<CStr>)>> {
-        self.raw_pwd_by_name(name).map(|o| {
-            o.map(|pwd| unsafe {
-                (
-                    (*pwd).pw_uid,
-                    CStr::from_ptr((*pwd).pw_dir).to_owned().into_boxed_c_str(),
-                )
-            })
-        })
+        self.raw_pwd_by_name(name)
+            .map(|o| o.map(|pwd| unsafe { ((*pwd).pw_uid, box_c_str((*pwd).pw_dir)) }))
     }
 
     pub fn user_name_home_by_id(&self, uid: u32) -> io::Result<Option<(Box<CStr>, Box<CStr>)>> {
-        self.raw_pwd_by_uid(uid).map(|o| {
-            o.map(|pwd| unsafe {
-                (
-                    CStr::from_ptr((*pwd).pw_name).to_owned().into_boxed_c_str(),
-                    CStr::from_ptr((*pwd).pw_dir).to_owned().into_boxed_c_str(),
-                )
-            })
-        })
+        self.raw_pwd_by_uid(uid)
+            .map(|o| o.map(|pwd| unsafe { (box_c_str((*pwd).pw_name), box_c_str((*pwd).pw_dir)) }))
     }
 
     pub fn user_name_by_id(&self, uid: u32) -> io::Result<Option<Box<CStr>>> {
-        self.raw_pwd_by_uid(uid).map(|o| {
-            o.map(|pwd| unsafe { CStr::from_ptr((*pwd).pw_name).to_owned().into_boxed_c_str() })
-        })
+        self.raw_pwd_by_uid(uid)
+            .map(|o| o.map(|pwd| unsafe { box_c_str((*pwd).pw_name) }))
     }
 
     pub fn group_id_by_name<S: AsRef<CStr>>(&self, name: S) -> io::Result<Option<u32>> {
@@ -124,7 +117,7 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::Error::last_os_error())
+                    Err(io::last_os_error())
                 }
             } else {
                 Ok(Some((*grd).gr_gid))
@@ -140,12 +133,10 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::Error::last_os_error())
+                    Err(io::last_os_error())
                 }
             } else {
-                Ok(Some(
-                    CStr::from_ptr((*grd).gr_name).to_owned().into_boxed_c_str(),
-                ))
+                Ok(Some(box_c_str((*grd).gr_name)))
             }
         }
     }
@@ -239,7 +230,7 @@ impl IAMContext {
             libc::endgrent();
 
             if errno != 0 {
-                Err(io::Error::last_os_error())
+                Err(io::last_os_error())
             } else {
                 Ok(buf)
             }
@@ -248,9 +239,7 @@ impl IAMContext {
 
     pub fn get_groups<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<Group>> {
         self.get_map_groups(user_name, |group| unsafe {
-            let name = CStr::from_ptr((*group).gr_name)
-                .to_owned()
-                .into_boxed_c_str();
+            let name = box_c_str((*group).gr_name);
             let id = (*group).gr_gid;
 
             Group { name, id }
@@ -267,25 +256,21 @@ impl IAMContext {
     }
 
     pub fn get_group_names<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<Box<CStr>>> {
-        self.get_map_groups(user_name, |group| unsafe {
-            CStr::from_ptr((*group).gr_name)
-                .to_owned()
-                .into_boxed_c_str()
-        })
-        .map(|mut gs| {
-            gs.sort();
-            gs.dedup();
-            gs
-        })
+        self.get_map_groups(user_name, |group| unsafe { box_c_str((*group).gr_name) })
+            .map(|mut gs| {
+                gs.sort();
+                gs.dedup();
+                gs
+            })
     }
 
     pub fn set_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
         unsafe {
             if libc::setgid(gid) == -1 {
-                return Err(io::Error::last_os_error());
+                return Err(io::last_os_error());
             }
             if libc::setuid(uid) == -1 {
-                return Err(io::Error::last_os_error());
+                return Err(io::last_os_error());
             }
         }
         Ok(())
@@ -294,10 +279,10 @@ impl IAMContext {
     pub fn set_effective_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
         unsafe {
             if libc::setegid(gid) == -1 {
-                return Err(io::Error::last_os_error());
+                return Err(io::last_os_error());
             }
             if libc::seteuid(uid) == -1 {
-                return Err(io::Error::last_os_error());
+                return Err(io::last_os_error());
             }
         }
         Ok(())
@@ -307,10 +292,10 @@ impl IAMContext {
     pub fn escalate_permissions(&self) -> io::Result<()> {
         unsafe {
             if libc::seteuid(0) == -1 {
-                return Err(io::Error::last_os_error());
+                return Err(io::last_os_error());
             }
             if libc::setegid(0) == -1 {
-                return Err(io::Error::last_os_error());
+                return Err(io::last_os_error());
             }
         }
         Ok(())
@@ -321,7 +306,7 @@ impl IAMContext {
         unsafe {
             let rc = libc::setgroups(groups.len() as _, groups.as_ptr());
             if rc == -1 {
-                Err(io::Error::last_os_error())
+                Err(io::last_os_error())
             } else {
                 Ok(())
             }

@@ -43,15 +43,14 @@ impl fmt::Display for InvalidZeroCharacter {
     }
 }
 
-impl From<InvalidZeroCharacter> for std::io::Error {
+impl From<InvalidZeroCharacter> for no_std_io::io::Error {
     #[inline]
     fn from(_value: InvalidZeroCharacter) -> Self {
-        std::io::Error::new(std::io::ErrorKind::Other, "found character 0")
+        no_std_io::io::Error::new(no_std_io::io::ErrorKind::Other, "found character 0")
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for InvalidZeroCharacter {}
+impl no_std_io::error::Error for InvalidZeroCharacter {}
 
 impl CBuffer {
     #[inline]

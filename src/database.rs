@@ -2,13 +2,10 @@
 
 use super::io::{self, FileExt};
 
-use std::{
-    ffi::{CStr, CString},
-    fmt,
-    io::{Read, Seek, SeekFrom, Write},
-    mem,
-    slice::SliceIndex,
-};
+use crate::ffi::{CStr, CString};
+use crate::io::{Read, Seek, SeekFrom, Write};
+use alloc_crate::vec::Vec;
+use core::{fmt, mem, slice::SliceIndex};
 use tty_info::Dev;
 
 #[repr(packed)]
@@ -117,7 +114,7 @@ fn create_base() -> io::Result<()> {
     io::DirBuilder::new()
         .mode(0o700)
         .recursive(true)
-        .create(unsafe { CStr::from_ptr(BASE_PATH.as_ptr().cast()) })
+        .create(unsafe { CStr::from_bytes_with_nul_unchecked(BASE_PATH) })
 }
 
 pub struct Database {
@@ -126,7 +123,7 @@ pub struct Database {
 }
 
 pub struct Iter<'a> {
-    inner: std::slice::Iter<'a, RawEntry>,
+    inner: core::slice::Iter<'a, RawEntry>,
 }
 
 impl Database {
@@ -142,10 +139,10 @@ impl Database {
         buf.extend_from_slice(user.to_bytes());
         buf.push(0);
         buf.shrink_to_fit();
-        let path = unsafe { CString::from_vec_with_nul_unchecked(buf) };
+        let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
         let mut f = match io::OpenOptions::new().read(true).open_cstr(path) {
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            Err(err) if err.kind() == crate::io::ErrorKind::NotFound => {
                 return Ok(Self {
                     user,
                     inner: Vec::new(),
@@ -167,7 +164,7 @@ impl Database {
 
         let mut buf = Vec::<RawEntry>::with_capacity(len / mem::size_of::<RawEntry>());
         unsafe {
-            f.read_exact(std::slice::from_raw_parts_mut(
+            f.read_exact(core::slice::from_raw_parts_mut(
                 buf.as_mut_ptr() as *mut u8,
                 len,
             ))?;
@@ -256,7 +253,7 @@ impl Database {
         buf.extend_from_slice(self.user.to_bytes());
         buf.push(0);
         buf.shrink_to_fit();
-        let path = unsafe { CString::from_vec_with_nul_unchecked(buf) };
+        let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
         let mut file = io::OpenOptions::new()
             .read(false)
@@ -272,7 +269,7 @@ impl Database {
         file.set_len(0)?;
 
         file.write_all(unsafe {
-            std::slice::from_raw_parts(
+            core::slice::from_raw_parts(
                 self.inner.as_ptr() as *const u8,
                 self.len() * mem::size_of::<RawEntry>(),
             )
@@ -296,10 +293,10 @@ impl Database {
         buf.extend_from_slice(user.as_ref().to_bytes());
         buf.push(0);
         buf.shrink_to_fit();
-        let path = unsafe { CString::from_vec_with_nul_unchecked(buf) };
+        let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
         match io::remove_file(path) {
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) if err.kind() == crate::io::ErrorKind::NotFound => Ok(()),
             other => other,
         }
     }

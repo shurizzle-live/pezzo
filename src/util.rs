@@ -1,30 +1,13 @@
-pub fn slurp<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Vec<u8>> {
-    use std::{
-        fs::File,
-        io::{Read, Seek, SeekFrom},
-    };
-
-    let mut f = File::open(path)?;
-    let len = f.seek(SeekFrom::End(0))? as usize;
-    f.seek(SeekFrom::Start(0))?;
-
-    let mut buf = Vec::<u8>::with_capacity(len);
-    unsafe {
-        f.read_exact(std::slice::from_raw_parts_mut(buf.as_mut_ptr(), len))?;
-        buf.set_len(len);
-    }
-
-    Ok(buf)
-}
-
 cfg_if::cfg_if! {
     if #[cfg(unix)] {
+        use alloc_crate::vec::Vec;
+
         cfg_if::cfg_if! {
             if #[cfg(target_os = "linux")] {
-                pub fn slurp_cstr<P: AsRef<tty_info::CStr>>(path: P) -> std::io::Result<Vec<u8>> {
+                pub fn slurp_cstr<P: AsRef<crate::ffi::CStr>>(path: P) -> crate::io::Result<Vec<u8>> {
                     use super::io;
                     use io::AsRawFd;
-                    use std::io::Read;
+                    use crate::io::Read;
                     use tty_info::Errno;
 
                     let mut f = io::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
@@ -38,14 +21,14 @@ cfg_if::cfg_if! {
 
                     let mut buf = Vec::<u8>::with_capacity(len);
                     unsafe {
-                        f.read_exact(std::slice::from_raw_parts_mut(buf.as_mut_ptr(), len))?;
+                        f.read_exact(core::slice::from_raw_parts_mut(buf.as_mut_ptr(), len))?;
                         buf.set_len(len);
                     }
 
                     Ok(buf)
                 }
             } else {
-                pub fn slurp_cstr<P: AsRef<tty_info::CStr>>(path: P) -> std::io::Result<Vec<u8>> {
+                pub fn slurp_cstr<P: AsRef<crate::ffi::CStr>>(path: P) -> std::io::Result<Vec<u8>> {
                     use super::io;
                     use io::AsRawFd;
                     use std::io::Read;

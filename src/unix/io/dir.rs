@@ -1,8 +1,6 @@
-use std::{
-    cmp,
-    ffi::{CStr, CString},
-    iter::FusedIterator,
-};
+use crate::ffi::{CStr, CString};
+use alloc_crate::vec::Vec;
+use core::{cmp, iter::FusedIterator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Component<'a> {
@@ -304,7 +302,7 @@ impl<'a> Drop for DirBuilderBuffer<'a> {
 
 #[cfg(all(unix, not(target_os = "linux")))]
 fn is_dir(path: &CStr) -> bool {
-    use std::mem::MaybeUninit;
+    use core::mem::MaybeUninit;
     let md = unsafe {
         let mut buf = MaybeUninit::<libc::stat>::uninit();
         if { libc::stat(path.as_ptr(), buf.as_mut_ptr()) } == -1 {
@@ -355,16 +353,16 @@ impl DirBuilder {
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
-    fn mkdir(&self, path: &CStr) -> std::io::Result<()> {
+    fn mkdir(&self, path: &CStr) -> crate::io::Result<()> {
         if unsafe { libc::mkdir(path.as_ptr(), self.mode.into()) } == -1 {
-            Err(std::io::Error::last_os_error())
+            Err(crate::io::last_os_error())
         } else {
             Ok(())
         }
     }
 
     #[cfg(target_os = "linux")]
-    fn mkdir(&self, path: &CStr) -> std::io::Result<()> {
+    fn mkdir(&self, path: &CStr) -> crate::io::Result<()> {
         use linux_stat::CURRENT_DIRECTORY;
         use linux_syscalls::{syscall, Errno, Sysno};
 
@@ -379,7 +377,7 @@ impl DirBuilder {
         }
     }
 
-    pub fn create<P: AsRef<CStr> + IntoBuffer>(&self, path: P) -> std::io::Result<()> {
+    pub fn create<P: AsRef<CStr> + IntoBuffer>(&self, path: P) -> crate::io::Result<()> {
         if self.recursive {
             if path.as_ref().to_bytes().is_empty() {
                 return Ok(());
@@ -387,7 +385,7 @@ impl DirBuilder {
 
             match self.mkdir(path.as_ref()) {
                 Ok(()) => return Ok(()),
-                Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => (),
+                Err(ref e) if e.kind() == crate::io::ErrorKind::NotFound => (),
                 Err(_) if is_dir(path.as_ref()) => return Ok(()),
                 Err(e) => return Err(e),
             }
@@ -406,7 +404,7 @@ impl DirBuilder {
         }
     }
 
-    fn create_dir_all(&self, mut path: DirBuilderBuffer) -> std::io::Result<()> {
+    fn create_dir_all(&self, mut path: DirBuilderBuffer) -> crate::io::Result<()> {
         if path.buf.is_empty() {
             return Ok(());
         }
@@ -414,8 +412,8 @@ impl DirBuilder {
         match path.parent() {
             Some(p) => self.create_dir_all(p)?,
             None => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                return Err(crate::io::Error::new(
+                    crate::io::ErrorKind::Other,
                     "failed to create whole tree",
                 ));
             }
