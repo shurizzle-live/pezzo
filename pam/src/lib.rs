@@ -1,10 +1,14 @@
 #![cfg(unix)]
+#![no_std]
 
-use std::{ffi::CStr, marker::PhantomData, mem::MaybeUninit, pin::Pin};
+extern crate alloc as alloc_crate;
+
+use alloc_crate::boxed::Box;
+use core::{ffi::CStr, marker::PhantomData, mem::MaybeUninit, pin::Pin};
 
 include!(concat!(env!("OUT_DIR"), "/pam.rs"));
 
-impl ::std::error::Error for Error {}
+impl ::core2::error::Error for Error {}
 
 impl Error {
     #[inline]
@@ -61,9 +65,9 @@ impl From<ConvError> for Error {
     }
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = core::result::Result<T, Error>;
 
-pub type ConvResult<T> = std::result::Result<T, ConvError>;
+pub type ConvResult<T> = core::result::Result<T, ConvError>;
 
 pub trait CBuffer {
     fn leak_c_string(self) -> *mut libc::c_char;
@@ -97,7 +101,7 @@ unsafe extern "C" fn conversation_trampoline<C: Conversation>(
         }
         let conv = &mut *(appdata_ptr as *mut C);
 
-        for (i, msg) in std::slice::from_raw_parts(*msg, num_msg as usize)
+        for (i, msg) in core::slice::from_raw_parts(*msg, num_msg as usize)
             .iter()
             .enumerate()
         {

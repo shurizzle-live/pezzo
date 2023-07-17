@@ -214,6 +214,7 @@ fn linux_pam() {
         .header_contents("wrapper.h", "#include <security/pam_appl.h>")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .ctypes_prefix("libc")
+        .use_core()
         .parse_callbacks(Box::new(ErrorsConstants(errors.clone())));
     let bindings = builder.generate().expect("Unable to generate bindings");
     let errors = RefCell::take(&errors);
@@ -267,6 +268,7 @@ fn open_pam() {
         .header_contents("wrapper.h", "#include <security/pam_appl.h>")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .ctypes_prefix("libc")
+        .use_core()
         .parse_callbacks(Box::new(ErrorsConstants(errors.clone())));
     let bindings = builder.generate().expect("unable to generate bindings");
     let errors = RefCell::take(&errors);
