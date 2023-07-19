@@ -1,4 +1,5 @@
-use crate::ffi::CStr;
+use crate::ffi::{CStr, CString};
+use alloc_crate::vec::Vec;
 use core::iter::FusedIterator;
 
 #[used]
@@ -6,7 +7,7 @@ static mut ARGS: &[*const u8] = &[];
 #[used]
 static mut ENV: *const *const u8 = core::ptr::null();
 
-pub unsafe fn init(argc: isize, argv: *const *const u8, envp: *const *const u8) {
+pub(crate) unsafe fn init(argc: isize, argv: *const *const u8, envp: *const *const u8) {
     ARGS = core::slice::from_raw_parts(argv, argc as _);
     ENV = envp;
     #[cfg(target_os = "linux")]
@@ -46,6 +47,7 @@ pub fn var(name: &CStr) -> Option<&'static CStr> {
             if let Some(var) = strip_var_name(*ptr, name) {
                 return Some(CStr::from_ptr(var.cast()));
             }
+            ptr = ptr.add(1);
         }
         None
     }
@@ -95,4 +97,73 @@ impl FusedIterator for Vars {}
 
 pub fn vars() -> Vars {
     Vars(unsafe { ENV })
+}
+
+#[cfg(target_os = "linux")]
+fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
+    use linux_stat::Errno;
+    use linux_syscalls::{syscall, Sysno};
+
+    if buf.capacity() == 0 {
+        buf.reserve(1);
+    }
+
+    unsafe {
+        buf.set_len(0);
+
+        loop {
+            match syscall!(Sysno::getcwd, buf.as_ptr(), buf.capacity()) {
+                Err(Errno::ERANGE) => {
+                    buf.reserve(buf.capacity().max(1) * 2);
+                }
+                Err(err) => return Err(err.into()),
+                Ok(len) => {
+                    buf.set_len(len);
+                    return Ok(());
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
+    use crate::unix::__errno;
+
+    if buf.capacity() == 0 {
+        buf.reserve(1);
+    }
+
+    unsafe {
+        buf.set_len(0);
+
+        while libc::getcwd(buf.as_mut_ptr().cast(), buf.capacity()).is_null() {
+            let err = *__errno();
+
+            if err != libc::ERANGE {
+                return Err(crate::io::from_raw_os_error(err));
+            }
+
+            buf.reserve(buf.capacity().max(1) * 2);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn current_dir_in(buf: &mut Vec<u8>) -> crate::io::Result<()> {
+    getcwd(buf)?;
+
+    if buf.last().map(|&c| c != 0).unwrap_or(true) {
+        buf.reserve_exact(1);
+        buf.push(0);
+    }
+
+    Ok(())
+}
+
+pub fn current_dir() -> crate::io::Result<CString> {
+    let mut buf = Vec::new();
+    current_dir_in(&mut buf)?;
+    Ok(unsafe { CString::from_vec_with_nul_unchecked(buf) })
 }

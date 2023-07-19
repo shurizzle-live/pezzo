@@ -10,10 +10,10 @@ fn raw_path() -> Option<&'static [u8]> {
 }
 
 fn canonicalize<P: AsRef<CStr>>(path: P) -> crate::io::Result<Option<CString>> {
-    match crate::io::canonicalize(path) {
+    match crate::fs::normalize(path.as_ref()) {
         Err(err) if err.kind() == crate::io::ErrorKind::NotFound => Ok(None),
         Err(err) => Err(err),
-        Ok(path) => Ok(Some(path)),
+        Ok(path) => Ok(Some(path.into_owned())),
     }
 }
 
@@ -22,9 +22,9 @@ pub fn which<T: AsRef<CStr>>(binary_name: T) -> crate::io::Result<CString> {
     let binary_name = binary_name.as_ref();
 
     if memchr::memchr(b'/', binary_name.to_bytes()).is_some() {
-        let path = crate::io::canonicalize(binary_name)?;
+        let path = crate::fs::normalize(binary_name)?;
         return if binary_checker.is_valid(&path) {
-            Ok(path)
+            Ok(path.into_owned())
         } else {
             Err(crate::io::ErrorKind::NotFound.into())
         };

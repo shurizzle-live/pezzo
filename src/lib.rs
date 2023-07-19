@@ -11,7 +11,7 @@ pub mod ffi;
 pub mod unix;
 pub mod util;
 #[cfg(unix)]
-pub use unix::{__errno, env, io, which};
+pub use unix::{__errno, env, fs, init, io, which};
 
 pub const DEFAULT_PROMPT_TIMEOUT: u32 = 300;
 pub const PEZZO_NAME_CSTR: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"pezzo\0") };

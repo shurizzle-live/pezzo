@@ -1,5 +1,6 @@
 mod common;
 pub mod env;
+pub mod fs;
 mod iam;
 pub mod io;
 pub mod pam;
@@ -229,4 +230,9 @@ impl Context {
     pub fn get_group_ids<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<u32>> {
         self.iam.get_group_ids(user_name)
     }
+}
+
+/// # Safety
+pub unsafe fn init(argc: isize, argv: *const *const u8, envp: *const *const u8) {
+    self::env::init(argc, argv, envp);
 }

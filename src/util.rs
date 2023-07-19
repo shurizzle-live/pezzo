@@ -5,12 +5,10 @@ cfg_if::cfg_if! {
         cfg_if::cfg_if! {
             if #[cfg(target_os = "linux")] {
                 pub fn slurp_cstr<P: AsRef<crate::ffi::CStr>>(path: P) -> crate::io::Result<Vec<u8>> {
-                    use super::io;
-                    use io::AsRawFd;
-                    use crate::io::Read;
+                    use crate::io::{Read, AsRawFd};
                     use tty_info::Errno;
 
-                    let mut f = io::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
+                    let mut f = crate::fs::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
                     let len = 'stat: loop {
                         match unsafe { linux_stat::fstat(f.as_raw_fd()) } {
                             Err(Errno::EINTR) => (),
@@ -29,13 +27,11 @@ cfg_if::cfg_if! {
                 }
             } else {
                 pub fn slurp_cstr<P: AsRef<crate::ffi::CStr>>(path: P) -> std::io::Result<Vec<u8>> {
-                    use super::io;
-                    use io::AsRawFd;
-                    use std::io::Read;
+                    use std::io::{Read, AsRawFd};
                     use tty_info::Errno;
                     use std::mem::MaybeUninit;
 
-                    let mut f = io::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
+                    let mut f = crate::fs::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
                     let len = 'stat: loop {
                         let mut buf = MaybeUninit::<libc::stat>::uninit();
                         match unsafe {

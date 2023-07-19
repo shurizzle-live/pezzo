@@ -61,7 +61,7 @@ impl Group {
 
 #[cfg(target_os = "linux")]
 pub fn current_exe() -> io::Result<CString> {
-    match crate::io::read_link::<&'static CStr>(unsafe {
+    match crate::fs::read_link::<&'static CStr>(unsafe {
         CStr::from_bytes_with_nul_unchecked(b"/proc/self/exe\0")
     }) {
         Err(ref e) if e.kind() == io::ErrorKind::NotFound => Err(io::Error::new(
@@ -259,7 +259,7 @@ impl ProcessContext {
 
         iam.set_effective_identity(uid, gid)?;
 
-        let exe = crate::io::canonicalize(&current_exe()?)?;
+        let exe = crate::fs::canonicalize(&current_exe()?)?;
 
         let user_name = if let Some(user_name) = iam.user_name_by_id(uid)? {
             user_name

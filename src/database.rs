@@ -1,9 +1,10 @@
 #![allow(clippy::useless_conversion)]
 
-use super::io::{self, FileExt};
-
-use crate::ffi::{CStr, CString};
-use crate::io::{Read, Seek, SeekFrom, Write};
+use crate::{
+    ffi::{CStr, CString},
+    fs::{self, DirBuilder, FileExt, OpenOptions},
+    io::{self, Read, Seek, SeekFrom, Write},
+};
 use alloc_crate::vec::Vec;
 use core::{fmt, mem, slice::SliceIndex};
 use tty_info::Dev;
@@ -111,7 +112,7 @@ impl From<RawEntry> for Entry {
 const BASE_PATH: &[u8] = b"/var/run/pezzo\0";
 
 fn create_base() -> io::Result<()> {
-    io::DirBuilder::new()
+    DirBuilder::new()
         .mode(0o700)
         .recursive(true)
         .create(unsafe { CStr::from_bytes_with_nul_unchecked(BASE_PATH) })
@@ -141,7 +142,7 @@ impl Database {
         buf.shrink_to_fit();
         let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
-        let mut f = match io::OpenOptions::new().read(true).open_cstr(path) {
+        let mut f = match OpenOptions::new().read(true).open_cstr(path) {
             Err(err) if err.kind() == crate::io::ErrorKind::NotFound => {
                 return Ok(Self {
                     user,
@@ -255,7 +256,7 @@ impl Database {
         buf.shrink_to_fit();
         let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
-        let mut file = io::OpenOptions::new()
+        let mut file = OpenOptions::new()
             .read(false)
             .write(true)
             .append(false)
@@ -295,7 +296,7 @@ impl Database {
         buf.shrink_to_fit();
         let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
-        match io::remove_file(path) {
+        match fs::remove_file(path) {
             Err(err) if err.kind() == crate::io::ErrorKind::NotFound => Ok(()),
             other => other,
         }

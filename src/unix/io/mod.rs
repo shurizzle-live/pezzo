@@ -1,7 +1,3 @@
-mod canonicalize;
-mod dir;
-mod file;
-
 use core::{cmp, fmt, mem, ptr};
 
 pub use no_std_io::io::{BufRead, Error, ErrorKind, Read, Result, Seek, SeekFrom, Write};
@@ -11,6 +7,7 @@ pub use secure_read::io::RawFd;
 use alloc_crate::vec::Vec;
 
 pub trait FromRawFd {
+    /// # Safety
     unsafe fn from_raw_fd(fd: RawFd) -> Self;
 }
 
@@ -262,11 +259,6 @@ impl<W> IntoInnerError<W> {
         Self(writer, error)
     }
 
-    fn new_wrapped<W2>(self, f: impl FnOnce(W) -> W2) -> IntoInnerError<W2> {
-        let Self(writer, error) = self;
-        IntoInnerError::new(f(writer), error)
-    }
-
     pub fn error(&self) -> &Error {
         &self.1
     }
@@ -368,17 +360,6 @@ impl<W: ?Sized + Write> BufWriter<W> {
     #[inline]
     fn spare_capacity(&self) -> usize {
         self.buf.capacity() - self.buf.len()
-    }
-
-    fn write_to_buf(&mut self, buf: &[u8]) -> usize {
-        let available = self.spare_capacity();
-        let amt_to_buffer = available.min(buf.len());
-
-        unsafe {
-            self.write_to_buffer_unchecked(&buf[..amt_to_buffer]);
-        }
-
-        amt_to_buffer
     }
 
     fn flush_buf(&mut self) -> Result<()> {
@@ -538,8 +519,3 @@ impl<W: ?Sized + Write> Drop for BufWriter<W> {
         }
     }
 }
-
-pub use self::canonicalize::realpath as canonicalize;
-pub use self::canonicalize::*;
-pub use self::dir::*;
-pub use self::file::*;

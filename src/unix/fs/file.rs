@@ -1,6 +1,6 @@
 use crate::ffi::CStr;
 
-use super::{FromRawFd, RawFd};
+use crate::io::{FromRawFd, RawFd};
 
 pub trait FileExt {
     fn lock_shared(&mut self) -> crate::io::Result<()>;
@@ -10,10 +10,9 @@ pub trait FileExt {
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
-        use crate::io::{Read, Write, Seek, SeekFrom};
+        use crate::io::{Read, Write, Seek, SeekFrom, AsRawFd};
         use linux_syscalls::{syscall, Sysno, Errno};
         use linux_stat::CURRENT_DIRECTORY;
-        use super::AsRawFd;
         use linux_raw_sys::general::{
             LOCK_EX, LOCK_SH, O_APPEND, O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_TRUNC,
             O_WRONLY, SEEK_SET, SEEK_CUR, SEEK_END
@@ -133,7 +132,7 @@ cfg_if::cfg_if! {
             }
         }
     } else {
-        use super::AsRawFd;
+        use crate::io::AsRawFd;
 
         pub use std::fs::File;
 

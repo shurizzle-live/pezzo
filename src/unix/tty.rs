@@ -6,7 +6,10 @@ use crate::{
 use alloc_crate::{rc::Rc, vec::Vec};
 use core::fmt;
 
-use super::io::{self, File};
+use super::{
+    fs::{File, OpenOptions},
+    io,
+};
 
 use tty_info::TtyInfo;
 
@@ -68,7 +71,7 @@ impl fmt::Debug for TtyOut {
 
 impl TtyIn {
     pub fn open(info: Rc<TtyInfo>) -> io::Result<Self> {
-        let inner = BufReader::new(io::OpenOptions::new().read(true).open_cstr(info.path())?);
+        let inner = BufReader::new(OpenOptions::new().read(true).open_cstr(info.path())?);
         Ok(Self { info, inner })
     }
 
@@ -139,7 +142,7 @@ impl BufRead for TtyIn {
 
 impl TtyOut {
     pub fn open(info: Rc<TtyInfo>) -> io::Result<Self> {
-        let inner = BufWriter::new(io::OpenOptions::new().write(true).open_cstr(info.path())?);
+        let inner = BufWriter::new(OpenOptions::new().write(true).open_cstr(info.path())?);
         Ok(Self { info, inner })
     }
 

@@ -32,58 +32,6 @@ struct State {
 }
 
 #[cfg(target_os = "linux")]
-fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
-    use linux_stat::Errno;
-    use linux_syscalls::{syscall, Sysno};
-
-    if buf.capacity() == 0 {
-        buf.reserve(1);
-    }
-
-    unsafe {
-        buf.set_len(0);
-
-        loop {
-            match syscall!(Sysno::getcwd, buf.as_ptr(), buf.capacity()) {
-                Err(Errno::ERANGE) => {
-                    buf.reserve(buf.capacity().max(1) * 2);
-                }
-                Err(err) => return Err(err.into()),
-                Ok(len) => {
-                    buf.set_len(len);
-                    return Ok(());
-                }
-            }
-        }
-    }
-}
-
-#[cfg(not(target_os = "linux"))]
-fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
-    use crate::unix::__errno;
-
-    if buf.capacity() == 0 {
-        buf.reserve(1);
-    }
-
-    unsafe {
-        buf.set_len(0);
-
-        while libc::getcwd(buf.as_mut_ptr().cast(), buf.capacity()).is_null() {
-            let err = *__errno();
-
-            if err != libc::ERANGE {
-                return Err(crate::io::from_raw_os_error(err));
-            }
-
-            buf.reserve(buf.capacity().max(1) * 2);
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
 fn read_link_in(path: &CStr, buf: &mut Vec<u8>) -> crate::io::Result<()> {
     use linux_stat::CURRENT_DIRECTORY;
     use linux_syscalls::{syscall, Sysno};
@@ -144,7 +92,7 @@ fn read_link_in(path: &CStr, buf: &mut Vec<u8>) -> crate::io::Result<()> {
 
 pub fn read_link<P: AsRef<CStr>>(path: &CStr) -> crate::io::Result<CString> {
     let mut buf = Vec::new();
-    read_link_in(path.as_ref(), &mut buf)?;
+    read_link_in(path, &mut buf)?;
     Ok(unsafe { CString::from_vec_unchecked(buf) })
 }
 
@@ -237,10 +185,8 @@ pub fn realpath<P: AsRef<CStr>>(name: P) -> crate::io::Result<CString> {
     if unsafe { *name.get_unchecked(0) } == b'/' {
         state.rname.push(b'/')
     } else {
-        getcwd(&mut state.rname)?;
-        if state.rname.last().map(|&c| c == 0).unwrap_or(false) {
-            state.rname.pop();
-        }
+        crate::env::current_dir_in(&mut state.rname)?;
+        state.rname.pop();
     }
     let mut start = name.as_ptr().cast::<u8>();
     let mut extra = false;

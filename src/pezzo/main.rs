@@ -261,7 +261,7 @@ fn _main() -> Result<()> {
 
 #[no_mangle]
 fn main(argc: isize, argv: *const *const u8, envp: *const *const u8) {
-    unsafe { pezzo::env::init(argc, argv, envp) };
+    unsafe { pezzo::init(argc, argv, envp) };
 
     if let Err(err) = _main() {
         eprintln!("{:?}", err);
