@@ -189,6 +189,33 @@ impl IAMContext {
         })
     }
 
+    // TODO: get groups on macos
+    // #include <grp.h>
+    // #include <pwd.h>
+    // #include <stdio.h>
+    // #include <stdlib.h>
+    // #include <unistd.h>
+    //
+    // int32_t getgrouplist_2(const char *, gid_t, gid_t **);
+    //
+    // int main(void) {
+    //   struct passwd *pw;
+    //   pw = getpwuid(getuid());
+    //
+    //   gid_t *groups = NULL;
+    //   int32_t ngroups = getgrouplist_2(pw->pw_name, pw->pw_gid, &groups);
+    //
+    //   for (int i = 0; i < ngroups; i++) {
+    //     gid_t gid = groups[i];
+    //     struct group *gr = getgrgid(gid);
+    //     printf("%d(%s)\n", gid, gr ? gr->gr_name : NULL);
+    //   }
+    //
+    //   free(groups);
+    //
+    //   return 0;
+    // }
+
     fn get_map_groups<B, T, F>(&self, user_name: B, mapper: F) -> io::Result<Vec<T>>
     where
         B: AsRef<CStr>,
