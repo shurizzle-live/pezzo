@@ -216,94 +216,69 @@ impl IAMContext {
     //   return 0;
     // }
 
-    fn get_map_groups<B, T, F>(&self, user_name: B, mapper: F) -> io::Result<Vec<T>>
-    where
-        B: AsRef<CStr>,
-        F: Fn(*mut libc::group) -> T,
-    {
-        let name = user_name.as_ref();
-
-        unsafe {
-            let gid = self.raw_pwd_by_name(name)?.map(|pwd| (*pwd).pw_gid);
-
-            let mut buf = Vec::new();
-
-            libc::setgrent();
-
-            *crate::unix::__errno() = 0;
-
-            loop {
-                let group = libc::getgrent();
-                if group.is_null() {
-                    break;
-                }
-
-                let is_member = 'member: {
-                    if let Some(gid) = gid {
-                        if (*group).gr_gid == gid {
-                            break 'member true;
-                        }
-                    }
-
-                    let mut it = (*group).gr_mem;
-
-                    while !(*it).is_null() {
-                        if CStr::from_ptr(*it) == name {
-                            break 'member true;
-                        }
-
-                        it = it.add(1);
-                    }
-                    false
-                };
-
-                if is_member {
-                    buf.push(mapper(group));
-                }
-            }
-
-            let errno = *crate::unix::__errno();
-            libc::endgrent();
-
-            if errno != 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(buf)
+    pub fn get_groups<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<Group>> {
+        let mut groups = Vec::new();
+        for gid in self.get_group_ids(user_name)? {
+            if let Some(g) = self.group_by_id(gid)? {
+                groups.push(g);
             }
         }
-    }
-
-    pub fn get_groups<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<Group>> {
-        self.get_map_groups(user_name, |group| unsafe {
-            let name = CStr::from_ptr((*group).gr_name)
-                .to_owned()
-                .into_boxed_c_str();
-            let id = (*group).gr_gid;
-
-            Group { name, id }
-        })
+        Ok(groups)
     }
 
     pub fn get_group_ids<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<u32>> {
-        self.get_map_groups(user_name, |group| unsafe { (*group).gr_gid })
-            .map(|mut gs| {
-                gs.sort();
-                gs.dedup();
-                gs
-            })
+        let user_name = user_name.as_ref();
+        let gid = match self.raw_pwd_by_name(user_name)? {
+            Some(pwd) => unsafe { (*pwd).pw_gid },
+            _ => return Ok(Vec::new()),
+        };
+        let mut groups = unsafe {
+            let mut len = libc::sysconf(libc::_SC_NGROUPS_MAX) as usize;
+            let mut buf = Vec::<libc::gid_t>::new();
+            loop {
+                buf.reserve_exact(len);
+                *__errno() = 0;
+
+                if libc::getgrouplist(
+                    user_name.as_ptr().cast(),
+                    gid,
+                    buf.as_mut_ptr(),
+                    &mut len as *mut usize as _,
+                ) == -1
+                {
+                    if *__errno() != 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+                } else {
+                    buf.set_len(len);
+                    break;
+                }
+            }
+
+            buf
+        };
+        groups.sort();
+        groups.dedup();
+
+        if let Err(pos) = groups.binary_search(&gid) {
+            groups.insert(pos, gid);
+        }
+
+        groups.shrink_to_fit();
+
+        Ok(groups)
     }
 
     pub fn get_group_names<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<Box<CStr>>> {
-        self.get_map_groups(user_name, |group| unsafe {
-            CStr::from_ptr((*group).gr_name)
-                .to_owned()
-                .into_boxed_c_str()
-        })
-        .map(|mut gs| {
-            gs.sort();
-            gs.dedup();
-            gs
-        })
+        let mut groups = Vec::new();
+        for gid in self.get_group_ids(user_name)? {
+            if let Some(g) = self.group_name_by_id(gid)? {
+                if let Err(pos) = groups.binary_search(&g) {
+                    groups.insert(pos, g);
+                }
+            }
+        }
+        Ok(groups)
     }
 
     pub fn set_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
