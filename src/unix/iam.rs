@@ -189,33 +189,6 @@ impl IAMContext {
         })
     }
 
-    // TODO: get groups on macos
-    // #include <grp.h>
-    // #include <pwd.h>
-    // #include <stdio.h>
-    // #include <stdlib.h>
-    // #include <unistd.h>
-    //
-    // int32_t getgrouplist_2(const char *, gid_t, gid_t **);
-    //
-    // int main(void) {
-    //   struct passwd *pw;
-    //   pw = getpwuid(getuid());
-    //
-    //   gid_t *groups = NULL;
-    //   int32_t ngroups = getgrouplist_2(pw->pw_name, pw->pw_gid, &groups);
-    //
-    //   for (int i = 0; i < ngroups; i++) {
-    //     gid_t gid = groups[i];
-    //     struct group *gr = getgrgid(gid);
-    //     printf("%d(%s)\n", gid, gr ? gr->gr_name : NULL);
-    //   }
-    //
-    //   free(groups);
-    //
-    //   return 0;
-    // }
-
     pub fn get_groups<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<Group>> {
         let mut groups = Vec::new();
         for gid in self.get_group_ids(user_name)? {
@@ -226,6 +199,69 @@ impl IAMContext {
         Ok(groups)
     }
 
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "watchos",
+        target_os = "tvos"
+    ))]
+    pub fn get_group_ids<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<u32>> {
+        fn raw_groups(user_name: &CStr, gid: u32) -> io::Result<Option<(usize, *mut libc::gid_t)>> {
+            #[link(name = "c")]
+            extern "C" {
+                fn getgrouplist_2(
+                    name: *const libc::c_char,
+                    default_gid: libc::gid_t,
+                    groups: *mut *mut libc::gid_t,
+                ) -> i32;
+            }
+
+            let mut groups = core::ptr::null_mut();
+            let rc = unsafe { getgrouplist_2(user_name.as_ptr().cast(), gid as _, &mut groups) };
+            if rc == -1 {
+                return Err(io::Error::last_os_error());
+            }
+            let len = rc as usize;
+
+            Ok(Some((len, groups)))
+        }
+
+        let user_name = user_name.as_ref();
+
+        let gid = match self.raw_pwd_by_name(user_name)? {
+            Some(pwd) => unsafe { (*pwd).pw_gid },
+            _ => return Ok(Vec::new()),
+        };
+
+        match raw_groups(user_name, gid)? {
+            Some((len, ptr)) => {
+                struct Free(*mut libc::gid_t);
+                impl Drop for Free {
+                    fn drop(&mut self) {
+                        unsafe { libc::free(self.0.cast()) };
+                    }
+                }
+                let _f = Free(ptr);
+                let mut gids =
+                    unsafe { core::slice::from_raw_parts(ptr as *mut u32, len).to_vec() };
+                gids.sort();
+                gids.dedup();
+                if let Err(pos) = gids.binary_search(&gid) {
+                    gids.insert(pos, gid);
+                }
+
+                Ok(gids)
+            }
+            None => Ok(Vec::new()),
+        }
+    }
+
+    #[cfg(not(any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "watchos",
+        target_os = "tvos"
+    )))]
     pub fn get_group_ids<B: AsRef<CStr>>(&self, user_name: B) -> io::Result<Vec<u32>> {
         let user_name = user_name.as_ref();
         let gid = match self.raw_pwd_by_name(user_name)? {
@@ -233,26 +269,31 @@ impl IAMContext {
             _ => return Ok(Vec::new()),
         };
         let mut groups = unsafe {
-            let mut len = libc::sysconf(libc::_SC_NGROUPS_MAX) as usize;
+            let mut len = libc::sysconf(libc::_SC_NGROUPS_MAX) as usize + 1;
             let mut buf = Vec::<libc::gid_t>::new();
             loop {
                 buf.reserve_exact(len);
                 *__errno() = 0;
+                let prev = len;
 
                 if libc::getgrouplist(
                     user_name.as_ptr().cast(),
-                    gid,
-                    buf.as_mut_ptr(),
+                    gid as _,
+                    buf.as_mut_ptr().cast(),
                     &mut len as *mut usize as _,
                 ) == -1
                 {
                     if *__errno() != 0 {
                         return Err(io::Error::last_os_error());
                     }
-                } else {
-                    buf.set_len(len);
-                    break;
+
+                    if len != prev {
+                        continue;
+                    }
                 }
+
+                buf.set_len(len);
+                break;
             }
 
             buf
@@ -318,15 +359,32 @@ impl IAMContext {
         Ok(())
     }
 
+    // https://github.com/apple-oss-distributions/sudo/blob/main/sudo/lib/util/setgroups.c
     pub fn set_groups<B: AsRef<[u32]>>(&self, groups: B) -> io::Result<()> {
         let groups = groups.as_ref();
         unsafe {
             let rc = libc::setgroups(groups.len() as _, groups.as_ptr());
             if rc == -1 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(())
+                let last_error = io::Error::last_os_error();
+                if *__errno() != libc::EINVAL {
+                    return Err(last_error);
+                }
+
+                let mut maxgids = libc::sysconf(libc::_SC_NGROUPS_MAX);
+
+                if maxgids == -1 {
+                    maxgids = 16;
+                }
+
+                if groups.len() > (maxgids as usize) {
+                    if libc::setgroups(maxgids as _, groups.as_ptr()) == -1 {
+                        return Err(io::Error::last_os_error());
+                    }
+                } else {
+                    return Err(last_error);
+                }
             }
         }
+        Ok(())
     }
 }
