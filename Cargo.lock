@@ -174,9 +174,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.3.18"
+version = "4.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21b6396aa128fe4149d2af114f746eb048b5667e2844cc51ae90830f45de7ccb"
+checksum = "5fd304a20bff958a57f04c4e96a2e7594cc4490a0e809cbd48bb6437edaa452d"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -185,9 +185,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.3.18"
+version = "4.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d011140df54d9c4c592974ccd7d694dd4ab5b92ea0436435fa900a211d6b0f6"
+checksum = "01c6a3f08f1fe5662a35cfe393aec09c4df95f60ee93b7556505260f75eee9e1"
 dependencies = [
  "anstream",
  "anstyle",
@@ -278,9 +278,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.8.1"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
+checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
 name = "errno"
@@ -413,6 +413,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f65069b92fc347cd26930a5a584cf6b6ab156d48390474784c76d4c67313ce2d"
 
 [[package]]
+name = "linux-errnos"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d9999959fd7a0dce57905269e4b54fc222fb9e2dd09b947fc9128b4d27b8b6"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -426,14 +432,14 @@ checksum = "125164ff371966a3153fd1b9419d6dd3570f1824185403a42e71f2dc3b8b5db3"
 
 [[package]]
 name = "linux-stat"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e76d911debdcf887b3427c92f55cf77d134f3532e54ea5f75d755073eace5050"
+checksum = "dc8b57237d4d6491d6b4988d98cbe21fb3e3a6145b26b22692e4ed8474b84b97"
 dependencies = [
  "cstr_core",
  "cty",
  "linux-raw-sys",
- "linux-syscalls",
+ "linux-syscalls 0.3.1",
 ]
 
 [[package]]
@@ -443,7 +449,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccd3bf16474836a589239d78a04a26e4316b7912fcc43ee718de358f7c1a151f"
 dependencies = [
  "cc",
- "linux-errnos",
+ "linux-errnos 0.2.1",
+ "linux-raw-vdso",
+ "linux-sysno",
+ "rustc_version",
+]
+
+[[package]]
+name = "linux-syscalls"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "505ea392a152fe7a93c596597bfd79324cf0b9c5ce8757f6874208b9200e6ab4"
+dependencies = [
+ "cc",
+ "linux-errnos 0.3.4",
  "linux-raw-vdso",
  "linux-sysno",
  "rustc_version",
@@ -558,7 +577,7 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "linux-stat",
- "linux-syscalls",
+ "linux-syscalls 0.2.1",
  "memchr",
  "pam",
  "peg",
@@ -737,7 +756,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "linux-raw-sys",
- "linux-syscalls",
+ "linux-syscalls 0.2.1",
  "memchr",
  "pam",
  "unix-clock 0.1.0 (git+https://github.com/shurizzle/unix-clock)",
@@ -798,7 +817,7 @@ dependencies = [
 [[package]]
 name = "tty-info"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/tty-info.git#10d526c4691312e0554c9d96e6860eb721152193"
+source = "git+https://www.github.com/shurizzle/tty-info.git#11f5a504be130036d9242b4f9d9747ffdc9653d8"
 dependencies = [
  "atoi",
  "bindgen",
@@ -807,7 +826,7 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "linux-stat",
- "linux-syscalls",
+ "linux-syscalls 0.3.1",
  "memchr",
 ]
 
@@ -826,27 +845,27 @@ checksum = "301abaae475aa91687eb82514b328ab47a211a533026cb25fc3e519b86adfc3c"
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://github.com/shurizzle/unix-clock#8f0aadf456c51895372d5eae2a5eca59df48a7eb"
+source = "git+https://github.com/shurizzle/unix-clock#80903ee41c13d4ae0ea5611eeb791c9b478c3487"
 dependencies = [
  "bindgen",
  "bsd-errnos",
  "cfg-if",
  "libc",
  "linux-raw-sys",
- "linux-syscalls",
+ "linux-syscalls 0.3.1",
 ]
 
 [[package]]
 name = "unix-clock"
 version = "0.1.0"
-source = "git+https://www.github.com/shurizzle/unix-clock.git#8f0aadf456c51895372d5eae2a5eca59df48a7eb"
+source = "git+https://www.github.com/shurizzle/unix-clock.git#80903ee41c13d4ae0ea5611eeb791c9b478c3487"
 dependencies = [
  "bindgen",
  "bsd-errnos",
  "cfg-if",
  "libc",
  "linux-raw-sys",
- "linux-syscalls",
+ "linux-syscalls 0.3.1",
 ]
 
 [[package]]
