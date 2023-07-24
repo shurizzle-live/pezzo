@@ -1,7 +1,7 @@
 #![allow(clippy::useless_conversion)]
 
 use cfg_if::cfg_if;
-use unix_clock::raw::Timespec;
+use sstd::time::raw::Timespec;
 
 use crate::io;
 
@@ -100,6 +100,7 @@ cfg_if! {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+#[allow(non_camel_case_types)]
 struct pollfd_t {
     pub fd: io::RawFd,
     pub events: core::ffi::c_short,

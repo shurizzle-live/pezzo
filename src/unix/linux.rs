@@ -1,4 +1,4 @@
-use crate::io;
+use sstd::io;
 
 use linux_syscalls::{syscall, Sysno};
 use tty_info::{ProcessInfo, TtyInfo};

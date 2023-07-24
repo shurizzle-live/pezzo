@@ -412,7 +412,7 @@ impl DirBuilder {
         match path.parent() {
             Some(p) => self.create_dir_all(p)?,
             None => {
-                return Err(crate::io::Error::new(
+                return Err(crate::io::Error::new_static(
                     crate::io::ErrorKind::Other,
                     "failed to create whole tree",
                 ));

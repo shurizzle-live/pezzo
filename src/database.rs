@@ -1,12 +1,12 @@
 #![allow(clippy::useless_conversion)]
 
-use crate::{
+use alloc_crate::vec::Vec;
+use core::{fmt, mem, slice::SliceIndex};
+use sstd::{
     ffi::{CStr, CString},
     fs::{self, DirBuilder, FileExt, OpenOptions},
     io::{self, Read, Seek, SeekFrom, Write},
 };
-use alloc_crate::vec::Vec;
-use core::{fmt, mem, slice::SliceIndex};
 use tty_info::Dev;
 
 #[repr(packed)]
@@ -143,7 +143,7 @@ impl Database {
         let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
         let mut f = match OpenOptions::new().read(true).open_cstr(path) {
-            Err(err) if err.kind() == crate::io::ErrorKind::NotFound => {
+            Err(err) if err.kind() == sstd::io::ErrorKind::NotFound => {
                 return Ok(Self {
                     user,
                     inner: Vec::new(),
@@ -297,7 +297,7 @@ impl Database {
         let path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf) };
 
         match fs::remove_file(path) {
-            Err(err) if err.kind() == crate::io::ErrorKind::NotFound => Ok(()),
+            Err(err) if err.kind() == sstd::io::ErrorKind::NotFound => Ok(()),
             other => other,
         }
     }

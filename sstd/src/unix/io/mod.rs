@@ -1,73 +1,337 @@
 use core::{cmp, fmt, mem, ptr};
 
-pub use no_std_io::io::{BufRead, Error, ErrorKind, Read, Result, Seek, SeekFrom, Write};
-pub use secure_read::io::AsRawFd;
-pub use secure_read::io::RawFd;
+mod error;
+
+pub use error::*;
+
+pub use linux_stat::RawFd;
 
 use alloc_crate::vec::Vec;
+
+pub trait AsRawFd {
+    fn as_raw_fd(&self) -> RawFd;
+}
+
+impl AsRawFd for RawFd {
+    #[inline]
+    fn as_raw_fd(&self) -> RawFd {
+        *self
+    }
+}
 
 pub trait FromRawFd {
     /// # Safety
     unsafe fn from_raw_fd(fd: RawFd) -> Self;
 }
 
-#[cfg(target_os = "linux")]
-pub fn from_raw_os_error(no: i32) -> Error {
-    linux_syscalls::Errno::new(no).into()
+pub trait Seek {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64>;
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn from_raw_os_error(no: i32) -> Error {
-    use ErrorKind::*;
-    match no {
-        // libc::E2BIG => ArgumentListTooLong.into(),
-        libc::EADDRINUSE => AddrInUse.into(),
-        libc::EADDRNOTAVAIL => AddrNotAvailable.into(),
-        // libc::EBUSY => ResourceBusy.into(),
-        libc::ECONNABORTED => ConnectionAborted.into(),
-        libc::ECONNREFUSED => ConnectionRefused.into(),
-        libc::ECONNRESET => ConnectionReset.into(),
-        // libc::EDEADLK => Deadlock.into(),
-        // libc::EDQUOT => FilesystemQuotaExceeded.into(),
-        libc::EEXIST => AlreadyExists.into(),
-        // libc::EFBIG => FileTooLarge.into(),
-        // libc::EHOSTUNREACH => HostUnreachable.into(),
-        libc::EINTR => Interrupted.into(),
-        libc::EINVAL => InvalidInput.into(),
-        // libc::EISDIR => IsADirectory.into(),
-        // libc::ELOOP => FilesystemLoop.into(),
-        libc::ENOENT => NotFound.into(),
-        // libc::ENOMEM => OutOfMemory.into(),
-        // libc::ENOSPC => StorageFull.into(),
-        // libc::ENOSYS => Unsupported.into(),
-        // libc::EMLINK => TooManyLinks.into(),
-        // libc::ENAMETOOLONG => InvalidFilename.into(),
-        // libc::ENETDOWN => NetworkDown.into(),
-        // libc::ENETUNREACH => NetworkUnreachable.into(),
-        libc::ENOTCONN => NotConnected.into(),
-        // libc::ENOTDIR => NotADirectory.into(),
-        // libc::ENOTEMPTY => DirectoryNotEmpty.into(),
-        libc::EPIPE => BrokenPipe.into(),
-        // libc::EROFS => ReadOnlyFilesystem.into(),
-        // libc::ESPIPE => NotSeekable.into(),
-        // libc::ESTALE => StaleNetworkFileHandle.into(),
-        libc::ETIMEDOUT => TimedOut.into(),
-        // libc::ETXTBSY => ExecutableFileBusy.into(),
-        // libc::EXDEV => CrossesDevices.into(),
-        libc::EACCES | libc::EPERM => PermissionDenied.into(),
-
-        // These two constants can have the same value on some systems,
-        // but different values on others, so we can't use a match
-        // clause
-        x if x == libc::EAGAIN || x == libc::EWOULDBLOCK => WouldBlock.into(),
-
-        x => ::no_std_io::io::Error::new(Uncategorized, x.description().unwrap_or("Unknown error")),
+impl<S: Seek + ?Sized> Seek for &mut S {
+    #[inline]
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
+        (**self).seek(pos)
     }
 }
 
-#[inline]
-pub fn last_os_error() -> Error {
-    from_raw_os_error(unsafe { *crate::__errno() })
+#[derive(Copy, PartialEq, Eq, Clone, Debug)]
+pub enum SeekFrom {
+    Start(u64),
+    End(i64),
+    Current(i64),
+}
+
+pub trait Write {
+    fn write(&mut self, buf: &[u8]) -> Result<usize>;
+
+    fn flush(&mut self) -> Result<()>;
+
+    fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.write(buf) {
+                Ok(0) => {
+                    return Err(Error::new_static(
+                        ErrorKind::WriteZero,
+                        "failed to write whole buffer",
+                    ));
+                }
+                Ok(n) => buf = &buf[n..],
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
+
+    fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> Result<()> {
+        struct Adaptor<'a, T: ?Sized + 'a> {
+            inner: &'a mut T,
+            error: Result<()>,
+        }
+
+        impl<T: Write + ?Sized> fmt::Write for Adaptor<'_, T> {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                match self.inner.write_all(s.as_bytes()) {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        self.error = Err(e);
+                        Err(fmt::Error)
+                    }
+                }
+            }
+        }
+
+        let mut output = Adaptor {
+            inner: self,
+            error: Ok(()),
+        };
+        match fmt::write(&mut output, fmt) {
+            Ok(()) => Ok(()),
+            Err(..) => {
+                if output.error.is_err() {
+                    output.error
+                } else {
+                    Err(Error::new_static(ErrorKind::Other, "formatter error"))
+                }
+            }
+        }
+    }
+
+    fn by_ref(&mut self) -> &mut Self
+    where
+        Self: Sized,
+    {
+        self
+    }
+}
+
+impl<W: Write + ?Sized> Write for &mut W {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        (**self).write(buf)
+    }
+
+    #[inline]
+    fn flush(&mut self) -> Result<()> {
+        (**self).flush()
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> Result<()> {
+        (**self).write_all(buf)
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> Result<()> {
+        (**self).write_fmt(fmt)
+    }
+}
+
+impl Write for &mut [u8] {
+    #[inline]
+    fn write(&mut self, data: &[u8]) -> Result<usize> {
+        let amt = cmp::min(data.len(), self.len());
+        let (a, b) = mem::take(self).split_at_mut(amt);
+        a.copy_from_slice(&data[..amt]);
+        *self = b;
+        Ok(amt)
+    }
+
+    #[inline]
+    fn write_all(&mut self, data: &[u8]) -> Result<()> {
+        if self.write(data)? == data.len() {
+            Ok(())
+        } else {
+            Err(Error::new_static(
+                ErrorKind::WriteZero,
+                "failed to write whole buffer",
+            ))
+        }
+    }
+
+    #[inline]
+    fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl Write for Vec<u8> {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        self.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> Result<()> {
+        self.extend_from_slice(buf);
+        Ok(())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
+pub trait Read {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
+        read_to_end(self, buf)
+    }
+
+    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.read(buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let tmp = buf;
+                    buf = &mut tmp[n..];
+                }
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
+            }
+        }
+        if !buf.is_empty() {
+            Err(Error::new_static(
+                ErrorKind::UnexpectedEof,
+                "failed to fill whole buffer",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn by_ref(&mut self) -> &mut Self
+    where
+        Self: Sized,
+    {
+        self
+    }
+}
+
+pub trait BufRead: Read {
+    fn fill_buf(&mut self) -> Result<&[u8]>;
+
+    fn consume(&mut self, amt: usize);
+}
+
+impl<R: Read + ?Sized> Read for &mut R {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        (**self).read(buf)
+    }
+
+    #[inline]
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
+        (**self).read_exact(buf)
+    }
+}
+
+impl<B: BufRead + ?Sized> BufRead for &mut B {
+    #[inline]
+    fn fill_buf(&mut self) -> Result<&[u8]> {
+        (**self).fill_buf()
+    }
+
+    #[inline]
+    fn consume(&mut self, amt: usize) {
+        (**self).consume(amt)
+    }
+}
+
+impl Read for &[u8] {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let amt = cmp::min(buf.len(), self.len());
+        let (a, b) = self.split_at(amt);
+
+        // First check if the amount of bytes we want to read is small:
+        // `copy_from_slice` will generally expand to a call to `memcpy`, and
+        // for a single byte the overhead is significant.
+        if amt == 1 {
+            buf[0] = a[0];
+        } else {
+            buf[..amt].copy_from_slice(a);
+        }
+
+        *self = b;
+        Ok(amt)
+    }
+
+    #[inline]
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
+        if buf.len() > self.len() {
+            return Err(Error::new_static(
+                ErrorKind::UnexpectedEof,
+                "failed to fill whole buffer",
+            ));
+        }
+        let (a, b) = self.split_at(buf.len());
+
+        // First check if the amount of bytes we want to read is small:
+        // `copy_from_slice` will generally expand to a call to `memcpy`, and
+        // for a single byte the overhead is significant.
+        if buf.len() == 1 {
+            buf[0] = a[0];
+        } else {
+            buf.copy_from_slice(a);
+        }
+
+        *self = b;
+        Ok(())
+    }
+}
+
+impl BufRead for &[u8] {
+    #[inline]
+    fn fill_buf(&mut self) -> Result<&[u8]> {
+        Ok(*self)
+    }
+
+    #[inline]
+    fn consume(&mut self, amt: usize) {
+        *self = &self[amt..];
+    }
+}
+
+fn read_to_end<R: Read + ?Sized>(r: &mut R, buf: &mut Vec<u8>) -> Result<usize> {
+    read_to_end_with_reservation(r, buf, |_| 32)
+}
+
+fn read_to_end_with_reservation<R, F>(
+    r: &mut R,
+    buf: &mut Vec<u8>,
+    mut reservation_size: F,
+) -> Result<usize>
+where
+    R: Read + ?Sized,
+    F: FnMut(&R) -> usize,
+{
+    let start_len = buf.len();
+    loop {
+        if buf.len() == buf.capacity() {
+            buf.reserve(reservation_size(r));
+        }
+
+        let tmp = unsafe {
+            core::slice::from_raw_parts_mut(
+                buf.as_mut_ptr().add(buf.len()),
+                buf.capacity() - buf.len(),
+            )
+        };
+
+        match r.read(tmp) {
+            Ok(0) => return Ok(buf.len() - start_len),
+            Ok(n) => {
+                assert!(n <= tmp.len());
+                unsafe { buf.set_len(buf.len() + n) };
+            }
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => (),
+            Err(e) => return Err(e),
+        }
+    }
 }
 
 const DEFAULT_BUF_SIZE: usize = 8 * 1024;
@@ -232,7 +496,7 @@ impl WriterPanicked {
         "BufWriter inner writer panicked, what data remains unwritten is not known";
 }
 
-impl no_std_io::error::Error for WriterPanicked {}
+impl crate::error::Error for WriterPanicked {}
 
 impl fmt::Display for WriterPanicked {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -282,7 +546,7 @@ impl<W> From<IntoInnerError<W>> for Error {
     }
 }
 
-impl<W: Send + fmt::Debug> no_std_io::error::Error for IntoInnerError<W> {}
+impl<W: Send + fmt::Debug> crate::error::Error for IntoInnerError<W> {}
 
 impl<W> fmt::Display for IntoInnerError<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -402,7 +666,7 @@ impl<W: ?Sized + Write> BufWriter<W> {
 
             match r {
                 Ok(0) => {
-                    return Err(Error::new(
+                    return Err(Error::new_static(
                         ErrorKind::WriteZero,
                         "failed to write the buffered data",
                     ));

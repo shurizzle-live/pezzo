@@ -7,7 +7,8 @@ static mut ARGS: &[*const u8] = &[];
 #[used]
 static mut ENV: *const *const u8 = core::ptr::null();
 
-pub(crate) unsafe fn init(argc: isize, argv: *const *const u8, envp: *const *const u8) {
+#[allow(clippy::missing_safety_doc)]
+pub unsafe fn init(argc: isize, argv: *const *const u8, envp: *const *const u8) {
     ARGS = core::slice::from_raw_parts(argv, argc as _);
     ENV = envp;
     #[cfg(target_os = "linux")]

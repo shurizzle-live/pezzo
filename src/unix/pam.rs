@@ -1,7 +1,9 @@
-use crate::ffi::CStr;
-use crate::io::{self, Write};
 use alloc_crate::rc::Rc;
 use core::{cell::RefCell, mem};
+use sstd::{
+    ffi::CStr,
+    io::{self, Write},
+};
 
 pub use pam::Pam as Authenticator;
 pub use pam::*;

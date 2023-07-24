@@ -1,32 +1,32 @@
 mod checker;
 
 pub use self::checker::*;
-use crate::ffi::{CStr, CString};
 use alloc_crate::{boxed::Box, vec::Vec};
+use sstd::ffi::{CStr, CString};
 
 #[inline]
 fn raw_path() -> Option<&'static [u8]> {
-    unsafe { crate::env::var(CStr::from_bytes_with_nul_unchecked(b"PATH\0")).map(CStr::to_bytes) }
+    unsafe { sstd::env::var(CStr::from_bytes_with_nul_unchecked(b"PATH\0")).map(CStr::to_bytes) }
 }
 
-fn canonicalize<P: AsRef<CStr>>(path: P) -> crate::io::Result<Option<CString>> {
-    match crate::fs::normalize(path.as_ref()) {
-        Err(err) if err.kind() == crate::io::ErrorKind::NotFound => Ok(None),
+fn canonicalize<P: AsRef<CStr>>(path: P) -> sstd::io::Result<Option<CString>> {
+    match sstd::fs::normalize(path.as_ref()) {
+        Err(err) if err.kind() == sstd::io::ErrorKind::NotFound => Ok(None),
         Err(err) => Err(err),
         Ok(path) => Ok(Some(path.into_owned())),
     }
 }
 
-pub fn which<T: AsRef<CStr>>(binary_name: T) -> crate::io::Result<CString> {
+pub fn which<T: AsRef<CStr>>(binary_name: T) -> sstd::io::Result<CString> {
     let binary_checker = build_binary_checker();
     let binary_name = binary_name.as_ref();
 
     if memchr::memchr(b'/', binary_name.to_bytes()).is_some() {
-        let path = crate::fs::normalize(binary_name)?;
+        let path = sstd::fs::normalize(binary_name)?;
         return if binary_checker.is_valid(&path) {
             Ok(path.into_owned())
         } else {
-            Err(crate::io::ErrorKind::NotFound.into())
+            Err(sstd::io::ErrorKind::NotFound.into())
         };
     } else if let Some(raw_path) = raw_path() {
         let mut buf = Vec::new();
@@ -53,7 +53,7 @@ pub fn which<T: AsRef<CStr>>(binary_name: T) -> crate::io::Result<CString> {
         }
     }
 
-    Err(crate::io::ErrorKind::NotFound.into())
+    Err(sstd::io::ErrorKind::NotFound.into())
 }
 
 fn build_binary_checker() -> CompositeChecker {

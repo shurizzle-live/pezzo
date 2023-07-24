@@ -88,7 +88,7 @@ where
     }
 }
 
-impl no_std_io::error::Error for Error {}
+impl sstd::error::Error for Error {}
 
 #[inline]
 pub fn parse<B: AsRef<[u8]>>(buf: B) -> core::result::Result<Rules, Error> {

@@ -1,15 +1,11 @@
-use crate::{
+use sstd::{
     ffi::CStr,
-    io::{AsRawFd, BufRead, BufReader, BufWriter, RawFd, Read, Write},
+    fs::{File, OpenOptions},
+    io::{self, AsRawFd, BufRead, BufReader, BufWriter, RawFd, Read, Write},
 };
 
 use alloc_crate::{rc::Rc, vec::Vec};
 use core::fmt;
-
-use super::{
-    fs::{File, OpenOptions},
-    io,
-};
 
 use tty_info::TtyInfo;
 
@@ -105,17 +101,17 @@ impl AsRawFd for TtyIn {
 
 impl Read for TtyIn {
     #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> sstd::io::Result<usize> {
         self.inner.read(buf)
     }
 
     #[inline]
-    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> crate::io::Result<usize> {
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> sstd::io::Result<usize> {
         self.inner.read_to_end(buf)
     }
 
     #[inline]
-    fn read_exact(&mut self, buf: &mut [u8]) -> crate::io::Result<()> {
+    fn read_exact(&mut self, buf: &mut [u8]) -> sstd::io::Result<()> {
         self.inner.read_exact(buf)
     }
 
@@ -130,7 +126,7 @@ impl Read for TtyIn {
 
 impl BufRead for TtyIn {
     #[inline]
-    fn fill_buf(&mut self) -> crate::io::Result<&[u8]> {
+    fn fill_buf(&mut self) -> sstd::io::Result<&[u8]> {
         self.inner.fill_buf()
     }
 

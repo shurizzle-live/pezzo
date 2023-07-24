@@ -1,4 +1,4 @@
-use crate::ffi::{CStr, CString};
+use sstd::ffi::{CStr, CString};
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {

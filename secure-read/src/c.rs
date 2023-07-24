@@ -43,14 +43,14 @@ impl fmt::Display for InvalidZeroCharacter {
     }
 }
 
-impl From<InvalidZeroCharacter> for no_std_io::io::Error {
+impl From<InvalidZeroCharacter> for sstd::io::Error {
     #[inline]
     fn from(_value: InvalidZeroCharacter) -> Self {
-        no_std_io::io::Error::new(no_std_io::io::ErrorKind::Other, "found character 0")
+        sstd::io::Error::new_static(sstd::io::ErrorKind::Other, "found character 0")
     }
 }
 
-impl no_std_io::error::Error for InvalidZeroCharacter {}
+impl sstd::error::Error for InvalidZeroCharacter {}
 
 impl CBuffer {
     #[inline]
@@ -96,6 +96,7 @@ impl CBuffer {
         unsafe { slice::from_raw_parts_mut(self.ptr, self.len()) }
     }
 
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn into_raw_parts(mut self) -> (*mut i8, usize) {
         if self.is_empty() {
             (ptr::null_mut(), 0)
@@ -111,6 +112,7 @@ impl CBuffer {
         }
     }
 
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn from_raw_parts(ptr: *mut i8, len: usize, capacity: usize) -> Self {
         Self {
             ptr: ptr.cast(),
@@ -120,11 +122,13 @@ impl CBuffer {
     }
 
     #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn leak(self) -> *mut i8 {
         self.into_raw_parts().0
     }
 
     #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         self.len = new_len;
     }

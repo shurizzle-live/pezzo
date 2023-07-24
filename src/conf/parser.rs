@@ -3,7 +3,6 @@ use core::{
     ops::{Range, RangeFrom, RangeTo},
 };
 
-use crate::ffi::{CStr, CString};
 use alloc_crate::{boxed::Box, rc::Rc, vec::Vec};
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use nom::{
@@ -15,6 +14,7 @@ use nom::{
     AsBytes, Err, IResult, InputIter, InputLength, Offset, Parser, Slice,
 };
 use nom_locate::LocatedSpan;
+use sstd::ffi::{CStr, CString};
 
 #[derive(Debug, Clone)]
 pub enum Origin {
@@ -35,16 +35,16 @@ pub enum EnvTemplatePart {
 }
 
 #[derive(Debug, Clone)]
-pub struct EnvTemplate(Rc<Box<[EnvTemplatePart]>>);
+pub struct EnvTemplate(Rc<[EnvTemplatePart]>);
 
 impl EnvTemplate {
     pub fn format(&self) -> Box<CStr> {
         let mut buf = Vec::new();
 
-        for p in &**self.0 {
+        for p in &*self.0 {
             match p {
                 EnvTemplatePart::Var(ref name) => {
-                    if let Some(txt) = crate::env::var(name) {
+                    if let Some(txt) = sstd::env::var(name) {
                         buf.extend_from_slice(txt.to_bytes());
                     }
                 }
@@ -60,9 +60,9 @@ impl EnvTemplate {
 
 #[derive(Debug, Clone)]
 pub enum Env {
-    Unset(Rc<Box<CStr>>),
-    Copy(Rc<Box<CStr>>),
-    Set(Rc<Box<CStr>>, EnvTemplate),
+    Unset(Rc<CStr>),
+    Copy(Rc<CStr>),
+    Set(Rc<CStr>, EnvTemplate),
 }
 
 #[derive(Debug, Clone)]
@@ -180,7 +180,7 @@ where
     }
 }
 
-impl<T, E> no_std_io::error::Error for Error<T, E>
+impl<T, E> sstd::error::Error for Error<T, E>
 where
     T: AsBytes,
     E: LocatedError<T> + fmt::Debug,
@@ -713,7 +713,7 @@ where
             many0(alt((template_part_str, template_part_var))),
             char::<I, E>(b'"'),
         )(input)?;
-        let res = EnvTemplate(Rc::new(parts.into_boxed_slice()));
+        let res = EnvTemplate(Rc::from(parts));
 
         Ok((input, res))
     }
@@ -730,13 +730,13 @@ where
     {
         alt((
             map(preceded(char(b'-'), env_name), |name| {
-                Env::Unset(Rc::new(name.into_boxed_c_str()))
+                Env::Unset(Rc::from(name))
             }),
             map(
                 pair(terminated(env_name, char(b'=')), env_template),
-                |(name, val)| Env::Set(Rc::new(name.into_boxed_c_str()), val),
+                |(name, val)| Env::Set(Rc::from(name), val),
             ),
-            map(env_name, |name| Env::Copy(Rc::new(name.into_boxed_c_str()))),
+            map(env_name, |name| Env::Copy(Rc::from(name))),
         ))(input)
     }
 

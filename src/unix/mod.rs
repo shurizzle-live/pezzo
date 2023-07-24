@@ -1,8 +1,5 @@
 mod common;
-pub mod env;
-pub mod fs;
 mod iam;
-pub mod io;
 pub mod pam;
 pub mod tty;
 pub mod which;
@@ -26,9 +23,9 @@ pub mod which;
     path = "bsd/netbsd.rs"
 )]
 mod imp;
-use crate::ffi::CStr;
 use alloc_crate::{boxed::Box, rc::Rc, vec::Vec};
 use core::cell::RefCell;
+use sstd::{ffi::CStr, io};
 use tty_info::Dev;
 
 mod process;
@@ -234,5 +231,5 @@ impl Context {
 
 /// # Safety
 pub unsafe fn init(argc: isize, argv: *const *const u8, envp: *const *const u8) {
-    self::env::init(argc, argv, envp);
+    sstd::env::init(argc, argv, envp);
 }

@@ -1,5 +1,5 @@
-use crate::{ffi::CStr, io};
 use alloc_crate::{borrow::ToOwned, boxed::Box, vec::Vec};
+use sstd::{ffi::CStr, io};
 
 use super::{Group, Pwd, User, __errno};
 
@@ -16,7 +16,7 @@ impl IAMContext {
     pub fn new() -> io::Result<Self> {
         unsafe {
             if libc::initgroups(b"root\0".as_ptr() as *const _, 0) == -1 {
-                return Err(io::last_os_error());
+                return Err(io::Error::last_os_error());
             }
         }
         Ok(Self)
@@ -53,7 +53,7 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::last_os_error())
+                    Err(io::Error::last_os_error())
                 }
             } else {
                 Ok(Some(pwd))
@@ -69,7 +69,7 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::last_os_error())
+                    Err(io::Error::last_os_error())
                 }
             } else {
                 Ok(Some(pwd))
@@ -117,7 +117,7 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::last_os_error())
+                    Err(io::Error::last_os_error())
                 }
             } else {
                 Ok(Some((*grd).gr_gid))
@@ -133,7 +133,7 @@ impl IAMContext {
                 if *__errno() == 0 {
                     Ok(None)
                 } else {
-                    Err(io::last_os_error())
+                    Err(io::Error::last_os_error())
                 }
             } else {
                 Ok(Some(box_c_str((*grd).gr_name)))
@@ -230,7 +230,7 @@ impl IAMContext {
             libc::endgrent();
 
             if errno != 0 {
-                Err(io::last_os_error())
+                Err(io::Error::last_os_error())
             } else {
                 Ok(buf)
             }
@@ -267,10 +267,10 @@ impl IAMContext {
     pub fn set_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
         unsafe {
             if libc::setgid(gid) == -1 {
-                return Err(io::last_os_error());
+                return Err(io::Error::last_os_error());
             }
             if libc::setuid(uid) == -1 {
-                return Err(io::last_os_error());
+                return Err(io::Error::last_os_error());
             }
         }
         Ok(())
@@ -279,10 +279,10 @@ impl IAMContext {
     pub fn set_effective_identity(&self, uid: u32, gid: u32) -> io::Result<()> {
         unsafe {
             if libc::setegid(gid) == -1 {
-                return Err(io::last_os_error());
+                return Err(io::Error::last_os_error());
             }
             if libc::seteuid(uid) == -1 {
-                return Err(io::last_os_error());
+                return Err(io::Error::last_os_error());
             }
         }
         Ok(())
@@ -292,10 +292,10 @@ impl IAMContext {
     pub fn escalate_permissions(&self) -> io::Result<()> {
         unsafe {
             if libc::seteuid(0) == -1 {
-                return Err(io::last_os_error());
+                return Err(io::Error::last_os_error());
             }
             if libc::setegid(0) == -1 {
-                return Err(io::last_os_error());
+                return Err(io::Error::last_os_error());
             }
         }
         Ok(())
@@ -306,7 +306,7 @@ impl IAMContext {
         unsafe {
             let rc = libc::setgroups(groups.len() as _, groups.as_ptr());
             if rc == -1 {
-                Err(io::last_os_error())
+                Err(io::Error::last_os_error())
             } else {
                 Ok(())
             }

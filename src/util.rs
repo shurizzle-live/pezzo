@@ -4,11 +4,11 @@ cfg_if::cfg_if! {
 
         cfg_if::cfg_if! {
             if #[cfg(target_os = "linux")] {
-                pub fn slurp_cstr<P: AsRef<crate::ffi::CStr>>(path: P) -> crate::io::Result<Vec<u8>> {
-                    use crate::io::{Read, AsRawFd};
+                pub fn slurp_cstr<P: AsRef<sstd::ffi::CStr>>(path: P) -> sstd::io::Result<Vec<u8>> {
+                    use sstd::io::{Read, AsRawFd};
                     use tty_info::Errno;
 
-                    let mut f = crate::fs::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
+                    let mut f = sstd::fs::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
                     let len = 'stat: loop {
                         match unsafe { linux_stat::fstat(f.as_raw_fd()) } {
                             Err(Errno::EINTR) => (),
