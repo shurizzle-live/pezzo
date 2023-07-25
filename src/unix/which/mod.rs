@@ -2,11 +2,14 @@ mod checker;
 
 pub use self::checker::*;
 use alloc_crate::{boxed::Box, vec::Vec};
-use sstd::ffi::{CStr, CString};
+use sstd::{
+    env::VarName,
+    ffi::{CStr, CString},
+};
 
 #[inline]
 fn raw_path() -> Option<&'static [u8]> {
-    unsafe { sstd::env::var(CStr::from_bytes_with_nul_unchecked(b"PATH\0")).map(CStr::to_bytes) }
+    unsafe { sstd::env::var(VarName::from_slice_unchecked(b"PATH")).map(CStr::to_bytes) }
 }
 
 fn canonicalize<P: AsRef<CStr>>(path: P) -> sstd::io::Result<Option<CString>> {

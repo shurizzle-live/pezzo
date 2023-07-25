@@ -14,7 +14,10 @@ use nom::{
     AsBytes, Err, IResult, InputIter, InputLength, Offset, Parser, Slice,
 };
 use nom_locate::LocatedSpan;
-use sstd::ffi::{CStr, CString};
+use sstd::{
+    env::VarName,
+    ffi::{CStr, CString},
+};
 
 #[derive(Debug, Clone)]
 pub enum Origin {
@@ -30,7 +33,7 @@ pub enum Target {
 
 #[derive(Debug, Clone)]
 pub enum EnvTemplatePart {
-    Var(Box<CStr>),
+    Var(Box<VarName>),
     Str(Box<CStr>),
 }
 
@@ -698,6 +701,9 @@ where
             };
 
             let (input, name) = name(input)?;
+            let name = unsafe {
+                Box::from_raw(Box::into_raw(name.into_bytes().into_boxed_slice()) as *mut VarName)
+            };
 
             let input = if braced {
                 char::<I, E>(b'}')(input)?.0
@@ -705,7 +711,7 @@ where
                 input
             };
 
-            Ok((input, EnvTemplatePart::Var(name.into_boxed_c_str())))
+            Ok((input, EnvTemplatePart::Var(name)))
         }
 
         let (input, parts) = delimited(
