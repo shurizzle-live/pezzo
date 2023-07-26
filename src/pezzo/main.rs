@@ -150,10 +150,11 @@ fn _main() -> Result<()> {
         .escalate_permissions()
         .context("Cannot set root permissions")?;
 
-    let (ctx, command, arguments, home) = {
+    let (ctx, arg0, command, arguments, home) = {
         (
             pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group, bell)
                 .context("Cannot instantiate tty")?,
+            ctx.arg0,
             ctx.command,
             ctx.arguments,
             ctx.target_home,
@@ -204,6 +205,7 @@ fn _main() -> Result<()> {
 
     let cmd = OsString::from_vec(command.into_bytes());
     let mut proc = std::process::Command::new(&cmd);
+    proc.arg0(arg0);
     proc.args(arguments);
 
     fn set_default_path(proc: &mut std::process::Command) -> &mut std::process::Command {

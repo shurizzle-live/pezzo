@@ -44,6 +44,7 @@ impl MatchResult {
 #[derive(Debug)]
 pub struct MatchContext {
     pub(crate) command: CString,
+    pub(crate) arg0: OsString,
     pub(crate) arguments: Vec<OsString>,
     pub(crate) target_user: User,
     pub(crate) target_group: Group,
@@ -62,16 +63,17 @@ impl MatchContext {
         group: Option<Box<CStr>>,
         mut arguments: Vec<OsString>,
     ) -> Result<Self> {
-        let mut command = arguments.remove(0).into_vec();
-        if command.last().map(|&c| c != 0).unwrap_or(true) {
-            command.push(0);
+        let mut arg0 = arguments.remove(0).into_vec();
+        if arg0.last().map(|&c| c != 0).unwrap_or(true) {
+            arg0.push(0);
         }
-        let command = CString::from_vec_with_nul(command)?;
-        let command = if let Ok(command) = pezzo::which::which(&command) {
+        let arg0 = CString::from_vec_with_nul(arg0)?;
+        let command = if let Ok(command) = pezzo::which::which(&arg0) {
             command
         } else {
-            bail!("Command {:?} not found", command);
+            bail!("Command {:?} not found", arg0);
         };
+        let arg0 = OsString::from_vec(arg0.into_bytes());
 
         let pwd = if let Some(name) = user {
             iam.pwd_by_name(name.as_ref())
@@ -101,6 +103,7 @@ impl MatchContext {
 
         Ok(Self {
             command,
+            arg0,
             arguments,
             target_user,
             target_group,

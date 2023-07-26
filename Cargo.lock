@@ -127,8 +127,8 @@ dependencies = [
 
 [[package]]
 name = "bsd-errnos"
-version = "0.1.2"
-source = "git+https://github.com/shurizzle/bsd-errnos.git#6abb39024a117eb1159ee0dc46e7bed62b6f1baf"
+version = "0.0.1"
+source = "git+https://github.com/shurizzle/bsd-errnos.git#da2a4e6153256e422c925ccbb7dabbf2ee8ba1ab"
 
 [[package]]
 name = "bstr"
@@ -577,7 +577,7 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "linux-stat",
- "linux-syscalls 0.2.1",
+ "linux-syscalls 0.3.1",
  "memchr",
  "pam",
  "peg",
@@ -655,9 +655,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.31"
+version = "1.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fe8a65d69dd0808184ebb5f836ab526bb259db23c657efa38711b1072ee47f0"
+checksum = "50f3b39ccfb720540debaa0164757101c08ecb8d326b15358ce76a62c7e85965"
 dependencies = [
  "proc-macro2",
 ]
@@ -770,9 +770,9 @@ checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
 
 [[package]]
 name = "serde"
-version = "1.0.174"
+version = "1.0.176"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b88756493a5bd5e5395d53baa70b194b05764ab85b59e43e4b8f4e1192fa9b1"
+checksum = "76dc28c9523c5d70816e393136b86d48909cfb27cecaa902d338c19ed47164dc"
 
 [[package]]
 name = "sha2"
