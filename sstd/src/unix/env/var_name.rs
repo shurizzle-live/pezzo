@@ -42,7 +42,7 @@ impl fmt::Debug for VarNameFromBytesError {
 }
 
 #[repr(transparent)]
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct VarName([u8]);
 
 impl VarName {
@@ -234,5 +234,19 @@ impl AsRef<[u8]> for VarName {
 impl Clone for Box<VarName> {
     fn clone(&self) -> Self {
         unsafe { Box::from_raw(Box::into_raw(self.to_vec().into_boxed_slice()) as *mut VarName) }
+    }
+}
+
+impl fmt::Debug for VarName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "b\"")?;
+        for &c in &self.0 {
+            if c == b'\'' {
+                fmt::Display::fmt(&b'\'', f)?;
+            } else {
+                fmt::Display::fmt(&core::ascii::escape_default(c), f)?;
+            }
+        }
+        write!(f, "\"")
     }
 }

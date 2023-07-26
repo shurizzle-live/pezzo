@@ -285,6 +285,12 @@ impl EnvironmentCapture<'_> {
     }
 }
 
+impl<H: BuildHasher> core::fmt::Debug for EnvironmentBuilder<H> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_map().entries(self.into_iter()).finish()
+    }
+}
+
 impl<'a> core::fmt::Debug for EnvironmentCapture<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         struct Iter<'a>(*const *const u8, PhantomData<&'a ()>);
