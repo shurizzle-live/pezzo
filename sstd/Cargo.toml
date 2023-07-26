@@ -11,6 +11,10 @@ c = ["linux-syscalls/libc-compat", "unix-clock/libc-compat"]
 memchr = "2.5.0"
 unix-clock = { git = "https://www.github.com/shurizzle/unix-clock.git", default-features = false }
 cfg-if = "1.0.0"
+hashbrown = { version = "0.14.0", default-features = false, features = [
+  "raw",
+  "ahash",
+] }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 linux-syscalls = { version = "0.3.1", default-features = false, features = [
