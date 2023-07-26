@@ -1,8 +1,14 @@
 use core::{hash::BuildHasher, marker::PhantomData};
 
-use crate::{env::VarName, ffi::CStr};
+use crate::{
+    env::{VarName, Vars},
+    ffi::CStr,
+};
 use alloc_crate::vec::Vec;
-use hashbrown::{hash_map::DefaultHashBuilder, raw::RawTable};
+use hashbrown::{
+    hash_map::DefaultHashBuilder,
+    raw::{RawIter, RawTable},
+};
 
 struct Var {
     total_len: usize,
@@ -129,6 +135,11 @@ pub struct EnvironmentCapture<'a> {
     _life: PhantomData<&'a ()>,
 }
 
+pub struct EnvironmentIter<'a, H: BuildHasher> {
+    env: &'a EnvironmentBuilder<H>,
+    inner: Result<RawIter<Var>, Vars>,
+}
+
 impl EnvironmentBuilder<DefaultHashBuilder> {
     pub fn new() -> Self {
         Self {
@@ -137,7 +148,9 @@ impl EnvironmentBuilder<DefaultHashBuilder> {
             table: RawTable::new(),
         }
     }
+}
 
+impl<H: BuildHasher> EnvironmentBuilder<H> {
     pub fn insert<K: AsRef<VarName>, V: AsRef<CStr>>(&mut self, k: K, v: V) {
         let k = k.as_ref();
         let v = v.as_ref();
@@ -209,8 +222,60 @@ impl EnvironmentBuilder<DefaultHashBuilder> {
         }
     }
 
-    pub fn clean(&mut self, value: bool) {
-        self.clean = value;
+    #[inline]
+    pub fn clean(&mut self) {
+        self.clean = true;
+    }
+
+    #[inline]
+    pub fn iter(&self) -> EnvironmentIter<H> {
+        self.into_iter()
+    }
+}
+
+impl<'a, H: BuildHasher> IntoIterator for &'a EnvironmentBuilder<H> {
+    type Item = (&'a VarName, &'a CStr);
+
+    type IntoIter = EnvironmentIter<'a, H>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        EnvironmentIter {
+            env: self,
+            inner: Ok(unsafe { self.table.iter() }),
+        }
+    }
+}
+
+impl<'a, H: BuildHasher> Iterator for EnvironmentIter<'a, H> {
+    type Item = (&'a VarName, &'a CStr);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.inner.as_mut() {
+                Ok(it) => {
+                    if let Some(var) = it.next() {
+                        let var = unsafe { var.as_ref() };
+                        if let Some(value) = var.value() {
+                            return Some((var.key(), value));
+                        } else {
+                            continue;
+                        }
+                    }
+                }
+                Err(it) => {
+                    let (name, value) = it.next()?;
+                    let hash = self.env.hash_builder.hash_one(name);
+
+                    if self.env.table.get(hash, |var| var.key() == name).is_some() {
+                        continue;
+                    } else {
+                        return Some((name, value));
+                    }
+                }
+            }
+
+            self.inner = Err(crate::env::vars());
+        }
     }
 }
 
