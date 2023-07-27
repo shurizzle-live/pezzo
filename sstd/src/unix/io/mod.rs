@@ -1,8 +1,10 @@
 use core::{cmp, fmt, mem, ptr};
 
 mod error;
+mod stdio;
 
 pub use error::*;
+pub use stdio::*;
 
 pub use linux_stat::RawFd;
 
@@ -781,5 +783,101 @@ impl<W: ?Sized + Write> Drop for BufWriter<W> {
         if !self.panicked {
             _ = self.flush_buf();
         }
+    }
+}
+
+pub struct LineWriter<W: Write> {
+    inner: BufWriter<W>,
+}
+
+impl<W: Write> LineWriter<W> {
+    #[inline]
+    pub fn new(inner: W) -> Self {
+        Self {
+            inner: BufWriter::new(inner),
+        }
+    }
+}
+
+impl<W: Write> LineWriter<W> {
+    #[inline]
+    pub fn get_ref(&self) -> &W {
+        self.inner.get_ref()
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut W {
+        self.inner.get_mut()
+    }
+
+    #[inline]
+    pub fn buffer(&self) -> &[u8] {
+        self.inner.buffer()
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+}
+
+impl<W: Write> Write for LineWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        let newline_idx = match memchr::memrchr(b'\n', buf) {
+            None => return self.inner.write(buf),
+            Some(newline_idx) => newline_idx + 1,
+        };
+
+        self.inner.flush_buf()?;
+
+        let lines = unsafe { buf.get_unchecked(..newline_idx) };
+
+        let flushed = self.inner.get_mut().write(lines)?;
+
+        if flushed == 0 {
+            return Ok(0);
+        }
+
+        let tail = unsafe {
+            if flushed >= newline_idx {
+                buf.get_unchecked(flushed..)
+            } else if newline_idx - flushed <= self.inner.capacity() {
+                buf.get_unchecked(flushed..newline_idx)
+            } else {
+                let scan_area = buf.get_unchecked(flushed..);
+                let scan_area = scan_area.get_unchecked(..self.inner.capacity());
+                match memchr::memrchr(b'\n', scan_area) {
+                    Some(newline_idx) => scan_area.get_unchecked(..(newline_idx + 1)),
+                    None => scan_area,
+                }
+            }
+        };
+
+        unsafe { self.inner.write_to_buffer_unchecked(tail) };
+
+        Ok(flushed + tail.len())
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<()> {
+        match memchr::memrchr(b'\n', buf) {
+            None => self.inner.write_all(buf),
+            Some(newline_idx) => {
+                let (lines, tail) = buf.split_at(newline_idx + 1);
+
+                if self.inner.buffer().is_empty() {
+                    self.inner.get_mut().write_all(lines)?;
+                } else {
+                    self.inner.write_all(lines)?;
+                    self.inner.flush_buf()?;
+                }
+
+                self.inner.write_all(tail)
+            }
+        }
+    }
+
+    #[inline]
+    fn flush(&mut self) -> Result<()> {
+        self.inner.flush()
     }
 }
