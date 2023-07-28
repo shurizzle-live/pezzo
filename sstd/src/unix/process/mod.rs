@@ -14,6 +14,10 @@
 #[path = "c_exit.rs"]
 mod exit;
 
+#[cfg(all(any(target_os = "linux", target_os = "android"), not(feature = "c")))]
+#[path = "linux_bare_exit.rs"]
+mod exit;
+
 pub use exit::*;
 
 use crate::{
