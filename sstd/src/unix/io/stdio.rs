@@ -297,13 +297,29 @@ impl<T> DerefMut for FakeSyncCell<T> {
 unsafe impl<T> Send for FakeSyncCell<T> {}
 unsafe impl<T> Sync for FakeSyncCell<T> {}
 
+static STDIN_INSTANCE: FakeSyncCell<OnceCell<FakeSyncCell<BufReader<raw::Stdin>>>> =
+    FakeSyncCell::new(OnceCell::new());
+static STDOUT_INSTANCE: FakeSyncCell<OnceCell<FakeSyncCell<LineWriter<raw::Stdout>>>> =
+    FakeSyncCell::new(OnceCell::new());
+static mut DTOR_REGISTERED: bool = false;
+
+extern "C" fn dtor() {
+    if let Some(inner) = STDOUT_INSTANCE.get() {
+        let _ = inner.get_mut().flush();
+    }
+}
+
+fn register_dtor() {
+    if unsafe { !DTOR_REGISTERED } {
+        unsafe { DTOR_REGISTERED = true };
+        let _ = crate::process::atexit(dtor);
+    }
+}
+
 #[must_use]
 pub fn stdin() -> Stdin {
-    static INSTANCE: FakeSyncCell<OnceCell<FakeSyncCell<BufReader<raw::Stdin>>>> =
-        FakeSyncCell::new(OnceCell::new());
-
     Stdin {
-        inner: INSTANCE.get_or_init(|| {
+        inner: STDIN_INSTANCE.get_or_init(|| {
             FakeSyncCell::new(BufReader::with_capacity(DEFAULT_BUF_SIZE, raw::Stdin))
         }),
     }
@@ -311,11 +327,11 @@ pub fn stdin() -> Stdin {
 
 #[must_use]
 pub fn stdout() -> Stdout {
-    static INSTANCE: FakeSyncCell<OnceCell<FakeSyncCell<LineWriter<raw::Stdout>>>> =
-        FakeSyncCell::new(OnceCell::new());
-
     Stdout {
-        inner: INSTANCE.get_or_init(|| FakeSyncCell::new(LineWriter::new(raw::Stdout))),
+        inner: STDOUT_INSTANCE.get_or_init(|| {
+            register_dtor();
+            FakeSyncCell::new(LineWriter::new(raw::Stdout))
+        }),
     }
 }
 

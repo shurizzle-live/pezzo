@@ -1,3 +1,21 @@
+#[cfg(any(
+    all(any(target_os = "linux", target_os = "android"), feature = "c"),
+    any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "watchos",
+        target_os = "tvos",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "openbsd",
+        target_os = "netbsd"
+    )
+))]
+#[path = "c_exit.rs"]
+mod exit;
+
+pub use exit::*;
+
 use crate::{
     ffi::{CStr, CString},
     io,
