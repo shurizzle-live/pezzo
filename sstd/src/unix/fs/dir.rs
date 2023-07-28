@@ -300,7 +300,7 @@ impl<'a> Drop for DirBuilderBuffer<'a> {
     }
 }
 
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "android"))))]
 fn is_dir(path: &CStr) -> bool {
     use core::mem::MaybeUninit;
     let md = unsafe {
@@ -314,7 +314,7 @@ fn is_dir(path: &CStr) -> bool {
     (md.st_mode & libc::S_IFMT) == libc::S_IFDIR
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn is_dir(path: &CStr) -> bool {
     use linux_stat::{stat_cstr, Errno};
     loop {
@@ -352,16 +352,16 @@ impl DirBuilder {
         self
     }
 
-    #[cfg(all(unix, not(target_os = "linux")))]
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
     fn mkdir(&self, path: &CStr) -> crate::io::Result<()> {
         if unsafe { libc::mkdir(path.as_ptr(), self.mode.into()) } == -1 {
-            Err(crate::io::last_os_error())
+            Err(crate::io::Error::last_os_error())
         } else {
             Ok(())
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn mkdir(&self, path: &CStr) -> crate::io::Result<()> {
         use linux_stat::CURRENT_DIRECTORY;
         use linux_syscalls::{syscall, Errno, Sysno};

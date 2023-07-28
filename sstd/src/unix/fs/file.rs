@@ -1,6 +1,13 @@
 use crate::ffi::CStr;
 
-use crate::io::{FromRawFd, RawFd};
+use crate::io::{AsRawFd, Errno, FromRawFd, RawFd, Read, Result, Seek, SeekFrom, Write};
+
+#[cfg(target_os = "macos")]
+const BUF_LIMIT: usize = libc::c_int::MAX as usize - 1;
+#[cfg(target_os = "linux")]
+const BUF_LIMIT: usize = isize::MAX as usize;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+const BUF_LIMIT: usize = libc::ssize_t::MAX as usize;
 
 pub trait FileExt {
     fn lock_shared(&mut self) -> crate::io::Result<()>;
@@ -8,32 +15,38 @@ pub trait FileExt {
     fn lock_exclusive(&mut self) -> crate::io::Result<()>;
 }
 
+#[derive(Debug)]
+pub struct File {
+    fd: RawFd,
+}
+
+impl AsRawFd for File {
+    #[inline(always)]
+    fn as_raw_fd(&self) -> RawFd {
+        self.fd
+    }
+}
+
+impl FromRawFd for File {
+    #[inline]
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self { fd }
+    }
+}
+
 cfg_if::cfg_if! {
-    if #[cfg(target_os = "linux")] {
-        use crate::io::{Read, Write, Seek, SeekFrom, AsRawFd};
-        use linux_syscalls::{syscall, Sysno, Errno};
+    if #[cfg(any(target_os = "linux", target_os = "android"))] {
+        use linux_syscalls::{syscall, Sysno};
         use linux_stat::CURRENT_DIRECTORY;
         use linux_raw_sys::general::{
             LOCK_EX, LOCK_SH, O_APPEND, O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_TRUNC,
             O_WRONLY, SEEK_SET, SEEK_CUR, SEEK_END
         };
 
-        #[derive(Debug)]
-        pub struct File {
-            fd: RawFd,
-        }
-
         impl File {
-            pub fn set_len(&mut self, size: u64) -> crate::io::Result<()> {
+            pub fn set_len(&mut self, size: u64) -> Result<()> {
                 _ = unsafe { syscall!([ro] Sysno::ftruncate, self.fd, size)? };
                 Ok(())
-            }
-        }
-
-        impl AsRawFd for File {
-            #[inline(always)]
-            fn as_raw_fd(&self) -> RawFd {
-                self.fd
             }
         }
 
@@ -41,7 +54,7 @@ cfg_if::cfg_if! {
             #[inline]
             fn read(&mut self, buf: &mut [u8]) -> crate::io::Result<usize> {
                 loop {
-                    match unsafe { syscall!(Sysno::read, self.fd, buf.as_mut_ptr(), buf.len()) } {
+                    match unsafe { syscall!(Sysno::read, self.fd, buf.as_mut_ptr(), core::cmp::min(buf.len(), BUF_LIMIT)) } {
                         Err(Errno::EINTR) => (),
                         Err(err) => return Err(err.into()),
                         Ok(len) => return Ok(len),
@@ -54,7 +67,7 @@ cfg_if::cfg_if! {
             #[inline]
             fn write(&mut self, buf: &[u8]) -> crate::io::Result<usize> {
                 loop {
-                    match unsafe { syscall!([ro] Sysno::write, self.fd, buf.as_ptr(), buf.len()) } {
+                    match unsafe { syscall!([ro] Sysno::write, self.fd, buf.as_ptr(), core::cmp::min(buf.len(), BUF_LIMIT)) } {
                         Err(Errno::EINTR) => (),
                         Err(err) => return Err(err.into()),
                         Ok(len) => return Ok(len),
@@ -65,13 +78,6 @@ cfg_if::cfg_if! {
             #[inline(always)]
             fn flush(&mut self) -> crate::io::Result<()> {
                 Ok(())
-            }
-        }
-
-        impl FromRawFd for File {
-            #[inline]
-            unsafe fn from_raw_fd(fd: RawFd) -> Self {
-                Self { fd }
             }
         }
 
@@ -132,10 +138,6 @@ cfg_if::cfg_if! {
             }
         }
     } else {
-        use crate::io::AsRawFd;
-
-        pub use std::fs::File;
-
         const O_RDONLY: u32 = libc::O_RDONLY as u32;
         const O_WRONLY: u32 = libc::O_WRONLY as u32;
         const O_RDWR: u32 = libc::O_RDWR as u32;
@@ -145,16 +147,52 @@ cfg_if::cfg_if! {
         const O_EXCL: u32 = libc::O_EXCL as u32;
         const O_CLOEXEC: u32 = libc::O_CLOEXEC as u32;
 
-        pub fn remove_file<P: AsRef<CStr>>(path: P) -> crate::io::Result<()> {
-            loop {
-                if unsafe { libc::unlink(path.as_ref().as_ptr()) } == -1 {
-                    match crate::io::Error::last_os_error() {
-                        err if err.kind() == crate::io::ErrorKind::Interrupted => (),
-                        err => return Err(err),
-                    }
+        use crate::io::Error;
+
+        impl File {
+            pub fn set_len(&mut self, size: u64) -> Result<()> {
+                if unsafe { libc::ftruncate(self.fd, size as _) } == -1 {
+                    Err(Error::last_os_error())
                 } else {
-                    return Ok(());
+                    Ok(())
                 }
+            }
+        }
+
+        impl Read for File {
+            fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+                loop {
+                    match unsafe { libc::read(self.fd, buf.as_mut_ptr().cast(), core::cmp::min(buf.len(), BUF_LIMIT)) } {
+                        -1 => {
+                            let err = Errno::last_os_error();
+                            if err != Errno::EINTR {
+                                return Err(err.into());
+                            }
+                        }
+                        len => return Ok(len as usize),
+                    }
+                }
+            }
+        }
+
+        impl Write for File {
+            fn write(&mut self, buf: &[u8]) -> Result<usize> {
+                loop {
+                    match unsafe { libc::write(self.fd, buf.as_ptr().cast(), core::cmp::min(buf.len(), BUF_LIMIT)) } {
+                        -1 => {
+                            let err = Errno::last_os_error();
+                            if err != Errno::EINTR {
+                                return Err(err.into());
+                            }
+                        }
+                        len => return Ok(len as usize),
+                    }
+                }
+            }
+
+            #[inline(always)]
+            fn flush(&mut self) -> Result<()> {
+                Ok(())
             }
         }
 
@@ -175,6 +213,20 @@ cfg_if::cfg_if! {
                 }
             }
         }
+
+        pub fn remove_file<P: AsRef<CStr>>(path: P) -> crate::io::Result<()> {
+            loop {
+                if unsafe { libc::unlink(path.as_ref().as_ptr()) } == -1 {
+                    match crate::io::Error::last_os_error() {
+                        err if err.kind() == crate::io::ErrorKind::Interrupted => (),
+                        err => return Err(err),
+                    }
+                } else {
+                    return Ok(());
+                }
+            }
+        }
+
     }
 }
 

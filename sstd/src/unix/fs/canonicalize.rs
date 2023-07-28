@@ -1,7 +1,7 @@
 use crate::ffi::{CStr, CString};
 use alloc_crate::vec::Vec;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn is_file_accessible(file: &CStr) -> bool {
     use linux_raw_sys::general::{AT_EACCESS, F_OK};
     use linux_stat::CURRENT_DIRECTORY;
@@ -12,7 +12,7 @@ fn is_file_accessible(file: &CStr) -> bool {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 fn is_file_accessible(file: &CStr) -> bool {
     unsafe {
         libc::faccessat(
@@ -63,8 +63,6 @@ fn read_link_in(path: &CStr, buf: &mut Vec<u8>) -> crate::io::Result<()> {
 
 #[cfg(not(target_os = "linux"))]
 fn read_link_in(path: &CStr, buf: &mut Vec<u8>) -> crate::io::Result<()> {
-    use crate::unix::__errno;
-
     if buf.capacity() == 0 {
         buf.reserve(1);
     }
@@ -78,8 +76,12 @@ fn read_link_in(path: &CStr, buf: &mut Vec<u8>) -> crate::io::Result<()> {
                 buf.as_mut_ptr().cast(),
                 buf.capacity(),
             ) {
-                -1 if *__errno() != libc::EFAULT => return Err(core::io::last_os_error()),
-                -1 => (),
+                -1 => {
+                    let err = crate::io::Errno::last_os_error();
+                    if err != crate::io::Errno::EFAULT {
+                        return Err(err.into());
+                    }
+                }
                 len if (len as usize) < buf.capacity() - 1 => {
                     buf.set_len(len as usize);
                     return Ok(());
@@ -153,19 +155,9 @@ unsafe fn dir_check(path: &mut Vec<u8>) -> bool {
     res
 }
 
-#[cfg(target_os = "linux")]
 #[inline(always)]
 fn eloop() -> crate::io::Error {
-    linux_stat::Errno::ELOOP.into()
-}
-
-#[cfg(not(target_os = "linux"))]
-#[inline(always)]
-fn eloop() -> crate::io::Error {
-    crate::io::Error::new(
-        crate::io::ErrorKind::Other,
-        "Too many symbolic links encountered",
-    )
+    crate::io::Errno::ELOOP.into()
 }
 
 #[inline(always)]

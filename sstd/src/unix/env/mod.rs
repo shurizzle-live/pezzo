@@ -143,8 +143,6 @@ fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
 
 #[cfg(not(target_os = "linux"))]
 fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
-    use crate::unix::__errno;
-
     if buf.capacity() == 0 {
         buf.reserve(1);
     }
@@ -153,10 +151,10 @@ fn getcwd(buf: &mut Vec<u8>) -> crate::io::Result<()> {
         buf.set_len(0);
 
         while libc::getcwd(buf.as_mut_ptr().cast(), buf.capacity()).is_null() {
-            let err = *__errno();
+            let err = crate::io::Errno::last_os_error();
 
-            if err != libc::ERANGE {
-                return Err(crate::io::from_raw_os_error(err));
+            if err != crate::io::Errno::ERANGE {
+                return Err(err.into());
             }
 
             buf.reserve(buf.capacity().max(1) * 2);

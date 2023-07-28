@@ -6,7 +6,7 @@ use core::{
 
 use crate::io::{AsRawFd, BufRead, BufReader, LineWriter, RawFd, Read, Result, Write};
 
-pub const DEFAULT_BUF_SIZE: usize = if cfg!(target_os = "espidf") {
+const DEFAULT_BUF_SIZE: usize = if cfg!(target_os = "espidf") {
     512
 } else {
     8 * 1024
@@ -24,21 +24,92 @@ mod raw {
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     const BUF_LIMIT: usize = libc::ssize_t::MAX as usize;
 
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[inline(always)]
+    fn _read(fd: RawFd, buf: &mut [u8]) -> Result<usize> {
+        unsafe {
+            Ok(handle_ebadf(
+                syscall!(
+                    Sysno::read,
+                    fd,
+                    buf.as_mut_ptr(),
+                    core::cmp::min(buf.len(), BUF_LIMIT)
+                ),
+                0,
+            )?)
+        }
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    #[inline(always)]
+    fn _read(fd: RawFd, buf: &mut [u8]) -> Result<usize> {
+        unsafe {
+            Ok(handle_ebadf(
+                match libc::read(
+                    fd,
+                    buf.as_mut_ptr().cast(),
+                    core::cmp::min(buf.len(), BUF_LIMIT),
+                ) {
+                    -1 => Err(Errno::last_os_error()),
+                    len => Ok(len as usize),
+                },
+                0,
+            )?)
+        }
+    }
+
+    fn read(fd: RawFd, buf: &mut [u8]) -> Result<usize> {
+        loop {
+            match _read(fd, buf) {
+                Err(err) if err.kind() == crate::io::ErrorKind::Interrupted => (),
+                other => return other,
+            }
+        }
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[inline(always)]
+    fn _write(fd: RawFd, buf: &[u8]) -> Result<usize> {
+        unsafe {
+            Ok(handle_ebadf(
+                syscall!([ro] Sysno::write, fd, buf.as_ptr(), core::cmp::min(buf.len(), BUF_LIMIT)),
+                buf.len(),
+            )?)
+        }
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    #[inline(always)]
+    fn _write(fd: RawFd, buf: &[u8]) -> Result<usize> {
+        unsafe {
+            Ok(handle_ebadf(
+                match libc::write(
+                    fd,
+                    buf.as_ptr().cast(),
+                    core::cmp::min(buf.len(), BUF_LIMIT),
+                ) {
+                    -1 => Err(Errno::last_os_error()),
+                    len => Ok(len as usize),
+                },
+                buf.len(),
+            )?)
+        }
+    }
+
+    fn write(fd: RawFd, buf: &[u8]) -> Result<usize> {
+        loop {
+            match _write(fd, buf) {
+                Err(err) if err.kind() == crate::io::ErrorKind::Interrupted => (),
+                other => return other,
+            }
+        }
+    }
+
     pub struct Stdin;
 
     impl Read for Stdin {
         fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-            unsafe {
-                Ok(handle_ebadf(
-                    syscall!(
-                        Sysno::read,
-                        self.as_raw_fd(),
-                        buf.as_mut_ptr(),
-                        core::cmp::min(buf.len(), BUF_LIMIT)
-                    ),
-                    0,
-                )?)
-            }
+            read(self.as_raw_fd(), buf)
         }
     }
 
@@ -53,12 +124,7 @@ mod raw {
 
     impl Write for Stdout {
         fn write(&mut self, buf: &[u8]) -> Result<usize> {
-            unsafe {
-                Ok(handle_ebadf(
-                    syscall!([ro] Sysno::write, self.as_raw_fd(), buf.as_ptr(), core::cmp::min(buf.len(), BUF_LIMIT)),
-                    buf.len(),
-                )?)
-            }
+            write(self.as_raw_fd(), buf)
         }
 
         fn flush(&mut self) -> Result<()> {
@@ -77,12 +143,7 @@ mod raw {
 
     impl Write for Stderr {
         fn write(&mut self, buf: &[u8]) -> Result<usize> {
-            unsafe {
-                Ok(handle_ebadf(
-                    syscall!([ro] Sysno::write, self.as_raw_fd(), buf.as_ptr(), core::cmp::min(buf.len(), BUF_LIMIT)),
-                    buf.len(),
-                )?)
-            }
+            write(self.as_raw_fd(), buf)
         }
 
         fn flush(&mut self) -> Result<()> {
