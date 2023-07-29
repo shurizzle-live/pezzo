@@ -1,6 +1,6 @@
 use sstd::{
     ffi::{CStr, CString},
-    prelude::rust_2018::*,
+    prelude::rust_2021::*,
 };
 
 use anyhow::{bail, Context, Result};

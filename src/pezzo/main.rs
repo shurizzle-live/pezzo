@@ -5,7 +5,7 @@ extern crate alloc;
 
 #[macro_use]
 extern crate sstd;
-pub use sstd::prelude::rust_2018::*;
+pub use sstd::prelude::rust_2021::*;
 
 mod cli;
 mod context;
@@ -239,7 +239,7 @@ fn _main() -> Result<()> {
     }
 
     let cmd = OsString::from_vec(command.into_bytes());
-    let mut proc = std::process::Command::new(&cmd);
+    let mut proc = sstd::process::Command::new(&cmd);
     proc.args(arguments);
 
     fn set_default_path(proc: &mut sstd::process::Command) -> &mut sstd::process::Command {

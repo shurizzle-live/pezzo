@@ -1,9 +1,9 @@
 use sstd::{
     ffi::{CStr, CString},
     fmt,
-    io::Write,
+    io::{LineWriter, Write},
     mem::ManuallyDrop,
-    prelude::rust_2018::*,
+    prelude::rust_2021::*,
 };
 
 pub struct Rest<I> {
@@ -224,22 +224,19 @@ impl<I: Iterator<Item = *const u8>> Parser<I> {
     }
 }
 
-// -h --help !
-// -V --version !
-// -v --validate
-// -K --remove-timestamp !
-// -k --reset-timestamp !
-// -B --bell
-// -u --user USER
-// -g --group GROUP
+fn print_usage<W: Write>(w: &mut W) -> sstd::io::Result<()> {
+    writeln!(w, "  sudo -h | -V | -k | -K")?;
+    writeln!(w, "  sudo -v [-kB] [-u USER] [-g GROUP] [command [args..]]")?;
+    writeln!(w, "  sudo [-kB] [-u USER] [-g GROUP] command [args..]")
+}
 
-fn help() -> ! {
+fn help_and_exit() -> ! {
     sstd::process::exit(0);
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NAME: &str = env!("CARGO_BIN_NAME");
-fn version() -> ! {
+fn version_and_exit() -> ! {
     println!("{} {}", NAME, VERSION);
     sstd::process::exit(0);
 }
@@ -461,13 +458,14 @@ pub enum Cli {
         bell: bool,
         user: Option<CString>,
         group: Option<CString>,
-        command: Option<&'static CStr>,
+        command: Option<CString>,
     },
     Run {
+        reset_timestamp: bool,
         bell: bool,
         user: Option<CString>,
         group: Option<CString>,
-        command: Vec<&'static CStr>,
+        command: Vec<CString>,
     },
 }
 
@@ -478,6 +476,8 @@ impl Cli {
             flags: FLAGS,
         };
 
+        let mut help = false;
+        let mut version = false;
         let mut validate = false;
         let mut remove_timestamp = false;
         let mut reset_timestamp = false;
@@ -488,59 +488,116 @@ impl Cli {
         for flag in parser.by_ref() {
             let flag = match flag {
                 Err(err) => {
-                    <Error as RawDisplay>::fmt(
-                        &err,
-                        &mut RawFormatter {
-                            buf: &mut sstd::io::stderr(),
-                        },
-                    )
-                    .unwrap();
+                    {
+                        let mut out = LineWriter::new(sstd::io::stderr());
+                        <Error as RawDisplay>::fmt(&err, &mut RawFormatter { buf: &mut out })
+                            .unwrap();
+                        writeln!(out).unwrap();
+                        print_usage(&mut out).unwrap();
+                        out.flush().unwrap();
+                    }
                     sstd::process::exit(1);
                 }
                 Ok(f) => f,
             };
 
             match flag {
-                Flag::RemoveTimestamp => todo!(),
-                Flag::ResetTimestamp => todo!(),
-                Flag::Validate => todo!(),
-                Flag::Bell => todo!(),
-                Flag::User(_) => todo!(),
-                Flag::Group(_) => todo!(),
-                _ => unreachable!(),
+                Flag::RemoveTimestamp => {
+                    remove_timestamp = true;
+                }
+                Flag::ResetTimestamp => {
+                    reset_timestamp = true;
+                }
+                Flag::Validate => {
+                    validate = true;
+                }
+                Flag::Bell => {
+                    bell = true;
+                }
+                Flag::User(u) => {
+                    user = Some(u);
+                }
+                Flag::Group(g) => {
+                    group = Some(g);
+                }
+                Flag::Help => {
+                    help = true;
+                }
+                Flag::Version => {
+                    version = true;
+                }
             }
         }
 
+        if help {
+            if version
+                || validate
+                || remove_timestamp
+                || reset_timestamp
+                || bell
+                || user.is_some()
+                || group.is_some()
+            {
+                print_usage(&mut sstd::io::stderr());
+                sstd::process::exit(1);
+            }
+            help_and_exit();
+        }
+
+        if version {
+            if validate
+                || remove_timestamp
+                || reset_timestamp
+                || bell
+                || user.is_some()
+                || group.is_some()
+            {
+                print_usage(&mut sstd::io::stderr());
+                sstd::process::exit(1);
+            }
+            version_and_exit();
+        }
+
         if remove_timestamp {
+            if validate || reset_timestamp || bell || user.is_some() || group.is_some() {
+                print_usage(&mut sstd::io::stderr());
+                sstd::process::exit(1);
+            }
+
             return Cli::RemoveTimestamp;
         }
 
         let mut rest = parser.rest();
         let command = rest.next();
 
-        if reset_timestamp && !validate && !bell && user.is_none() && group.is_none() {
-            if command.is_some() {
-                unreachable!()
-            }
+        if reset_timestamp && !bell && user.is_none() && group.is_none() && command.is_none() {
             return Cli::ResetTimestamp;
         }
 
         if validate {
-            unimplemented!("validate")
+            return Cli::Validate {
+                reset_timestamp,
+                bell,
+                user: user.map(ToOwned::to_owned),
+                group: group.map(ToOwned::to_owned),
+                command: command.map(ToOwned::to_owned),
+            };
         }
 
-        let mut command = if let Some(command) = command {
-            vec![command]
-        } else {
-            unreachable!();
-        };
-        command.extend(rest);
+        if let Some(command) = command {
+            let mut command = vec![command.to_owned()];
+            command.extend(rest.map(ToOwned::to_owned));
 
-        Cli::Run {
-            bell,
-            user: user.map(CString::from),
-            group: group.map(CString::from),
-            command,
+            return Cli::Run {
+                reset_timestamp,
+                bell,
+                user: user.map(ToOwned::to_owned),
+                group: group.map(ToOwned::to_owned),
+                command,
+            };
+        } else {
+            print_usage(&mut sstd::io::stderr());
+            sstd::process::exit(1);
         }
     }
 }

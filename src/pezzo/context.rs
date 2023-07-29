@@ -1,4 +1,4 @@
-use sstd::prelude::rust_2018::*;
+use sstd::prelude::rust_2021::*;
 
 use sstd::{
     cell::UnsafeCell,
