@@ -1,6 +1,6 @@
-use std::{
+use sstd::{
     ffi::{CStr, CString},
-    path::Path,
+    prelude::rust_2018::*,
 };
 
 use anyhow::{bail, Context, Result};
@@ -20,20 +20,9 @@ pub fn parse_box_c_str(input: &str) -> Result<Box<CStr>, &'static str> {
 }
 
 #[inline]
-pub fn run_path_with_cstr<T, E, F>(path: &Path, f: F) -> Result<T, E>
-where
-    E: From<std::io::Error>,
-    F: FnOnce(&CStr) -> Result<T, E>,
-{
-    use std::os::unix::prelude::OsStrExt;
-
-    run_with_cstr(path.as_os_str().as_bytes(), f)
-}
-
-#[inline]
 pub fn run_with_cstr<T, E, F>(bytes: &[u8], f: F) -> Result<T, E>
 where
-    E: From<std::io::Error>,
+    E: From<sstd::io::Error>,
     F: FnOnce(&CStr) -> Result<T, E>,
 {
     const MAX_STACK_ALLOCATION: usize = 384;
@@ -42,7 +31,7 @@ where
         return run_with_cstr_allocating(bytes, f);
     }
 
-    let mut buf = std::mem::MaybeUninit::<[u8; MAX_STACK_ALLOCATION]>::uninit();
+    let mut buf = sstd::mem::MaybeUninit::<[u8; MAX_STACK_ALLOCATION]>::uninit();
     let buf_ptr = buf.as_mut_ptr() as *mut u8;
 
     unsafe {
@@ -54,8 +43,8 @@ where
         core::slice::from_raw_parts(buf_ptr, bytes.len() + 1)
     }) {
         Ok(s) => f(s),
-        Err(_) => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
+        Err(_) => Err(sstd::io::Error::new_static(
+            sstd::io::ErrorKind::InvalidInput,
             "file name contained an unexpected NUL byte",
         )
         .into()),
@@ -66,32 +55,28 @@ where
 #[inline(never)]
 fn run_with_cstr_allocating<T, E, F>(bytes: &[u8], f: F) -> Result<T, E>
 where
-    E: From<std::io::Error>,
+    E: From<sstd::io::Error>,
     F: FnOnce(&CStr) -> Result<T, E>,
 {
     match CString::new(bytes) {
         Ok(s) => f(&s),
-        Err(_) => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
+        Err(_) => Err(sstd::io::Error::new_static(
+            sstd::io::ErrorKind::InvalidInput,
             "file name contained an unexpected NUL byte",
         )
         .into()),
     }
 }
 
-pub fn check_file_permissions<P: AsRef<Path>>(path: P) -> Result<()> {
-    run_path_with_cstr(path.as_ref(), |p| check_file_permissions_cstr(p))
-}
-
 #[cfg(not(target_os = "linux"))]
 pub fn check_file_permissions_cstr<P: AsRef<CStr>>(path: P) -> Result<()> {
     let path = path.as_ref();
 
-    let mut buf = std::mem::MaybeUninit::<libc::stat>::uninit();
+    let mut buf = sstd::mem::MaybeUninit::<libc::stat>::uninit();
     let md = loop {
         if unsafe { libc::stat(path.as_ptr().cast(), buf.as_mut_ptr()) == -1 } {
-            let err = std::io::Error::last_os_error();
-            if err.kind() != std::io::ErrorKind::Interrupted {
+            let err = sstd::io::Error::last_os_error();
+            if err.kind() != sstd::io::ErrorKind::Interrupted {
                 bail!("Cannot stat file {:?}", path);
             }
         } else {
@@ -132,29 +117,11 @@ pub fn check_file_permissions_cstr<P: AsRef<CStr>>(path: P) -> Result<()> {
 }
 
 #[inline(always)]
-fn _parse_conf<F: FnOnce() -> std::io::Result<Vec<u8>>>(f: F) -> Result<pezzo::conf::Rules> {
-    let content = f().context("Cannot read configuration file")?;
-    match pezzo::conf::parse(&content) {
-        Ok(c) => Ok(c),
-        Err(err) => {
-            let buf = &content[..err.location];
-            let mut line = 1;
-            let mut pos = 0;
-            for p in memchr::memchr_iter(b'\n', buf) {
-                line += 1;
-                pos = p;
-            }
-
-            let col = buf.len() - pos;
-            bail!(
-                "{}:{}: expected {}, got {}",
-                line,
-                col + 1,
-                err.expected,
-                content[err.location]
-            );
-        }
-    }
+fn _parse_conf<F: FnOnce() -> sstd::io::Result<Vec<u8>>>(f: F) -> Result<pezzo::conf::Rules> {
+    let content = f()
+        .map_err(anyhow::Error::msg)
+        .context("Cannot read configuration file")?;
+    pezzo::conf::parse(&content).map_err(anyhow::Error::msg)
 }
 
 pub fn parse_conf_cstr<P: AsRef<CStr>>(path: P) -> Result<pezzo::conf::Rules> {

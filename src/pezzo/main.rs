@@ -1,4 +1,11 @@
+#![no_std]
 #![no_main]
+
+extern crate alloc;
+
+#[macro_use]
+extern crate sstd;
+pub use sstd::prelude::rust_2018::*;
 
 mod cli;
 mod context;
@@ -8,15 +15,13 @@ use context::MatchContext;
 use tty_info::Dev;
 use util::*;
 
-use std::{
+use sstd::{
+    boxed::Box,
     cell::RefCell,
-    ffi::{CStr, OsStr, OsString},
+    ffi::{CStr, CString},
     io::Write,
-    os::unix::{
-        prelude::{OsStrExt, OsStringExt},
-        process::CommandExt,
-    },
     rc::Rc,
+    vec::Vec,
 };
 
 use anyhow::{bail, Context, Result};
@@ -59,18 +64,23 @@ pub struct Cli {
     #[arg(short, long, value_parser = parse_box_c_str, value_name = "GROUP", help("run command as the specified group name or ID"))]
     pub group: Option<Box<CStr>>,
     #[arg(trailing_var_arg(true), required(true))]
-    pub command: Vec<OsString>,
+    pub command: Vec<CString>,
 }
 
 fn _main() -> Result<()> {
-    let iam = IAMContext::new().context("Cannot initialize users and groups")?;
+    let iam = IAMContext::new()
+        .map_err(anyhow::Error::msg)
+        .context("Cannot initialize users and groups")?;
 
     iam.escalate_permissions()
+        .map_err(anyhow::Error::msg)
         .context("Cannot set root permissions")?;
 
-    let proc = ProcessContext::current(&iam).context("Cannot get process informations")?;
+    let proc = ProcessContext::current(&iam)
+        .map_err(anyhow::Error::msg)
+        .context("Cannot get process informations")?;
 
-    check_file_permissions(&proc.exe)?;
+    check_file_permissions_cstr(&proc.exe)?;
 
     let Cli {
         validate,
@@ -84,22 +94,31 @@ fn _main() -> Result<()> {
 
     if remove_timestamp {
         iam.escalate_permissions()
+            .map_err(anyhow::Error::msg)
             .context("Cannot set root permissions")?;
-        Database::delete(proc.original_user.name()).context("Cannot access database")?;
+        Database::delete(proc.original_user.name())
+            .map_err(anyhow::Error::msg)
+            .context("Cannot access database")?;
         return Ok(());
     }
 
     if reset_timestamp {
         iam.escalate_permissions()
+            .map_err(anyhow::Error::msg)
             .context("Cannot set root permissions")?;
-        let mut db = Database::new(proc.original_user.name()).context("Cannot open database")?;
+        let mut db = Database::new(proc.original_user.name())
+            .map_err(anyhow::Error::msg)
+            .context("Cannot open database")?;
         db.retain(|e| e.session_id() != proc.sid && e.tty() != proc.tty.device());
-        db.save().context("Cannot save database")?;
+        db.save()
+            .map_err(anyhow::Error::msg)
+            .context("Cannot save database")?;
         return Ok(());
     }
 
     if validate {
         iam.escalate_permissions()
+            .map_err(anyhow::Error::msg)
             .context("Cannot set root permissions")?;
 
         if is_expired(
@@ -110,11 +129,14 @@ fn _main() -> Result<()> {
         )? {
             let tty_info = Rc::new(
                 tty_info::TtyInfo::by_device(proc.tty.device())
+                    .map_err(anyhow::Error::msg)
                     .context("Cannot get a valid tty")?,
             );
 
             let out = Rc::new(RefCell::new(
-                TtyOut::open(tty_info.clone()).context("Cannot get a valid tty")?,
+                TtyOut::open(tty_info.clone())
+                    .map_err(anyhow::Error::msg)
+                    .context("Cannot get a valid tty")?,
             ));
 
             let mut auth = pezzo::unix::pam::Authenticator::new(
@@ -123,13 +145,16 @@ fn _main() -> Result<()> {
                 pezzo::unix::pam::PezzoConversation::from_values(
                     DEFAULT_PROMPT_TIMEOUT,
                     Rc::new(RefCell::new(
-                        TtyIn::open(tty_info).context("Cannot get a valid tty")?,
+                        TtyIn::open(tty_info)
+                            .map_err(anyhow::Error::msg)
+                            .context("Cannot get a valid tty")?,
                     )),
                     out.clone(),
                     proc.original_user.name(),
                     bell,
                 ),
             )
+            .map_err(anyhow::Error::msg)
             .context("Cannot instantiate PAM authenticator")?;
 
             autenticate(&mut auth, DEFAULT_MAX_RETRIES, out);
@@ -151,11 +176,13 @@ fn _main() -> Result<()> {
 
     ctx.iam
         .escalate_permissions()
+        .map_err(anyhow::Error::msg)
         .context("Cannot set root permissions")?;
 
     let (ctx, command, arguments, home) = {
         (
             pezzo::unix::Context::new(ctx.iam, ctx.proc, ctx.target_user, ctx.target_group, bell)
+                .map_err(anyhow::Error::msg)
                 .context("Cannot instantiate tty")?,
             ctx.command,
             ctx.arguments,
@@ -173,6 +200,7 @@ fn _main() -> Result<()> {
     {
         let mut auth = ctx
             .authenticator()
+            .map_err(anyhow::Error::msg)
             .context("Cannot instantiate PAM authenticator")?;
 
         autenticate(&mut auth, ctx.max_retries(), ctx.tty_out());
@@ -181,6 +209,7 @@ fn _main() -> Result<()> {
     update_db(ctx.original_user().name(), ctx.sid(), ctx.ttyno())?;
 
     ctx.escalate_permissions()
+        .map_err(anyhow::Error::msg)
         .context("Cannot set root permissions")?;
 
     {
@@ -190,18 +219,22 @@ fn _main() -> Result<()> {
         {
             let mut groups = ctx
                 .get_group_ids(ctx.target_user().name())
+                .map_err(anyhow::Error::msg)
                 .context("Cannot get user groups")?;
             if let Err(pos) = groups.binary_search(&gid) {
                 groups.insert(pos, gid);
             }
             ctx.set_groups(groups.as_slice())
+                .map_err(anyhow::Error::msg)
                 .context("Cannot set process groups")?;
         }
 
         ctx.set_identity(uid, gid)
+            .map_err(anyhow::Error::msg)
             .context("Cannot set uid and gid")?;
 
         ctx.set_effective_identity(uid, gid)
+            .map_err(anyhow::Error::msg)
             .context("Cannot set euid and egid")?;
     }
 
@@ -209,7 +242,7 @@ fn _main() -> Result<()> {
     let mut proc = std::process::Command::new(&cmd);
     proc.args(arguments);
 
-    fn set_default_path(proc: &mut std::process::Command) -> &mut std::process::Command {
+    fn set_default_path(proc: &mut sstd::process::Command) -> &mut sstd::process::Command {
         proc.env(
             "PATH",
             OsStr::from_bytes(b"/usr/local/sbin:/usr/local/bin:/usr/bin".as_slice()),
@@ -220,7 +253,7 @@ fn _main() -> Result<()> {
     if !keepenv {
         proc.env_clear();
         set_default_path(&mut proc);
-    } else if matches!(std::env::var_os("PATH"), None) {
+    } else if matches!(sstd::env::var_os("PATH"), None) {
         set_default_path(&mut proc);
     }
 
@@ -265,23 +298,29 @@ fn main(argc: isize, argv: *const *const u8, envp: *const *const u8) {
 
     if let Err(err) = _main() {
         eprintln!("{:?}", err);
-        std::process::exit(1);
+        sstd::process::exit(1);
     }
 }
 
 fn update_db(user_name: &CStr, sid: u32, ttyno: Dev) -> Result<()> {
-    let mut db = Database::new(user_name).context("Failed to open database")?;
+    let mut db = Database::new(user_name)
+        .map_err(anyhow::Error::msg)
+        .context("Failed to open database")?;
     db.retain(|e| e.session_id() != sid && e.tty() != ttyno);
     db.push(Entry {
         session_id: sid,
         tty: ttyno,
         last_login: pezzo::unix::time::now(),
     });
-    db.save().context("Unable to write database")
+    db.save()
+        .map_err(anyhow::Error::msg)
+        .context("Unable to write database")
 }
 
 fn is_expired(user_name: &CStr, sid: u32, ttyno: Dev, timeout: u64) -> Result<bool> {
-    let db = Database::new(user_name).context("Failed to open database")?;
+    let db = Database::new(user_name)
+        .map_err(anyhow::Error::msg)
+        .context("Failed to open database")?;
     if let Some(entry) = db
         .iter()
         .find(|&e| e.session_id() == sid && e.tty() == ttyno)
@@ -318,5 +357,5 @@ fn autenticate(
             _ = out.flush();
         }
     }
-    std::process::exit(1);
+    sstd::process::exit(1);
 }

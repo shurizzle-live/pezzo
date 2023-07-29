@@ -1,11 +1,9 @@
-use core::{
-    cell::{OnceCell, RefCell},
-    fmt,
-    mem::ManuallyDrop,
-};
-use std::{
+use sstd::{
     ffi::{CStr, CString},
-    io::{BufReader, BufWriter, Write},
+    fmt,
+    io::Write,
+    mem::ManuallyDrop,
+    prelude::rust_2018::*,
 };
 
 pub struct Rest<I> {
@@ -236,14 +234,14 @@ impl<I: Iterator<Item = *const u8>> Parser<I> {
 // -g --group GROUP
 
 fn help() -> ! {
-    std::process::exit(0);
+    sstd::process::exit(0);
 }
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NAME: &str = env!("CARGO_BIN_NAME");
 fn version() -> ! {
     println!("{} {}", NAME, VERSION);
-    std::process::exit(0);
+    sstd::process::exit(0);
 }
 
 pub enum FlagDesc<O> {
@@ -473,63 +471,6 @@ pub enum Cli {
     },
 }
 
-#[non_exhaustive]
-struct StderrInner;
-
-impl std::io::Write for StderrInner {
-    #[cfg(target_os = "linux")]
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        use linux_syscalls::{syscall, Errno, Sysno};
-
-        loop {
-            match unsafe { syscall!([ro] Sysno::write, 2, buf.as_ptr(), buf.len()) } {
-                Err(Errno::EINTR) => (),
-                Err(err) => return Err(err.into()),
-                Ok(len) => return Ok(len),
-            }
-        }
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        loop {
-            unsafe {
-                let rc = libc::write(2, buf.as_ptr().cast(), buf.len() as _);
-                if rc == -1 {
-                    if *pezzo::__errno() != libc::EINTR {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                } else {
-                    return Ok(rc as usize);
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-pub struct Stderr(&'static RefCell<BufWriter<StderrInner>>);
-
-impl std::io::Write for Stderr {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.borrow_mut().write(buf)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.0.borrow_mut().flush()
-    }
-}
-
-static mut STDERR: OnceCell<RefCell<BufWriter<StderrInner>>> = OnceCell::new();
-#[allow(clippy::cast_ref_to_mut)]
-pub fn stderr() -> Stderr {
-    Stderr(unsafe { STDERR.get_or_init(|| RefCell::new(BufWriter::new(StderrInner))) })
-}
-
 impl Cli {
     pub fn parse<I: Iterator<Item = *const u8>>(args: I) -> Self {
         let mut parser = FlagIterator {
@@ -547,9 +488,14 @@ impl Cli {
         for flag in parser.by_ref() {
             let flag = match flag {
                 Err(err) => {
-                    <Error as RawDisplay>::fmt(&err, &mut RawFormatter { buf: &mut stderr() })
-                        .unwrap();
-                    std::process::exit(1);
+                    <Error as RawDisplay>::fmt(
+                        &err,
+                        &mut RawFormatter {
+                            buf: &mut sstd::io::stderr(),
+                        },
+                    )
+                    .unwrap();
+                    sstd::process::exit(1);
                 }
                 Ok(f) => f,
             };

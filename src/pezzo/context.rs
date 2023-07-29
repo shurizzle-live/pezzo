@@ -1,8 +1,9 @@
-use std::{
+use sstd::prelude::rust_2018::*;
+
+use sstd::{
     cell::UnsafeCell,
     collections::HashMap,
-    ffi::{CStr, CString, OsStr, OsString},
-    os::unix::prelude::{OsStrExt, OsStringExt},
+    ffi::{CStr, CString},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -44,7 +45,7 @@ impl MatchResult {
 #[derive(Debug)]
 pub struct MatchContext {
     pub(crate) command: CString,
-    pub(crate) arguments: Vec<OsString>,
+    pub(crate) arguments: Vec<CString>,
     pub(crate) target_user: User,
     pub(crate) target_group: Group,
     pub(crate) target_home: Box<CStr>,
@@ -60,13 +61,10 @@ impl MatchContext {
         proc: ProcessContext,
         user: Option<Box<CStr>>,
         group: Option<Box<CStr>>,
-        mut arguments: Vec<OsString>,
+        mut arguments: Vec<CString>,
     ) -> Result<Self> {
-        let mut command = arguments.remove(0).into_vec();
-        if command.last().map(|&c| c != 0).unwrap_or(true) {
-            command.push(0);
-        }
-        let command = CString::from_vec_with_nul(command)?;
+        let mut command = arguments.remove(0).into_bytes_with_nul();
+        let command = CString::from_vec_with_nul(command).map_err(anyhow::Error::msg)?;
         let command = if let Ok(command) = pezzo::which::which(&command) {
             command
         } else {
@@ -75,10 +73,12 @@ impl MatchContext {
 
         let pwd = if let Some(name) = user {
             iam.pwd_by_name(name.as_ref())
+                .map_err(anyhow::Error::msg)
                 .context("Cannot get users informations")?
                 .ok_or_else(|| anyhow!("Invalid user {:?}", name))?
         } else {
             iam.default_user()
+                .map_err(anyhow::Error::msg)
                 .context("Cannot get groups informations")?
                 .ok_or_else(|| anyhow!("Invalid root user"))?
         };
@@ -89,11 +89,13 @@ impl MatchContext {
         let target_group = group.map_or_else(
             || {
                 iam.group_by_id(default_gid)
+                    .map_err(anyhow::Error::msg)
                     .context("Cannot get groups informations")?
                     .ok_or_else(|| anyhow!("Invalid group {}", default_gid))
             },
             |name| {
                 iam.group_by_name(name)
+                    .map_err(anyhow::Error::msg)
                     .context("Cannot get groups informations")?
                     .map_err(|name| anyhow!("Invalid group {:?}", name))
             },
@@ -121,11 +123,12 @@ impl MatchContext {
             let root_name = self
                 .iam
                 .group_name_by_id(0)
+                .map_err(anyhow::Error::msg)
                 .context("cannot get groups informations")?
                 .ok_or_else(|| anyhow!("Cannot get root user"))?;
 
             let res = root_name.as_ref() == name;
-            std::ptr::write(self.root_name.get(), Some(root_name));
+            sstd::ptr::write(self.root_name.get(), Some(root_name));
             Ok(res)
         }
     }
@@ -140,7 +143,7 @@ impl MatchContext {
             }
 
             {
-                let groups = self.iam.get_group_names(name)?;
+                let groups = self.iam.get_group_names(name).map_err(anyhow::Error::msg)?;
                 let cache = &mut *self.groups_cache.get();
                 cache.insert(name.to_owned().into_boxed_c_str(), groups);
             }
