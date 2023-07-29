@@ -13,7 +13,7 @@ unix-clock = { git = "https://www.github.com/shurizzle/unix-clock.git", default-
 cfg-if = "1.0.0"
 hashbrown = { version = "0.14.0", default-features = false, features = [
   "raw",
-  "ahash",
+  "rustc-internal-api",
 ] }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]

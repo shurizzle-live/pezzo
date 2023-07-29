@@ -1,14 +1,12 @@
 use core::{hash::BuildHasher, marker::PhantomData};
 
 use crate::{
+    collections::hash_map::RandomState,
     env::{VarName, Vars},
     ffi::CStr,
 };
 use alloc_crate::vec::Vec;
-use hashbrown::{
-    hash_map::DefaultHashBuilder,
-    raw::{RawIter, RawTable},
-};
+use hashbrown::raw::{RawIter, RawTable};
 
 struct Var {
     total_len: usize,
@@ -124,7 +122,7 @@ impl Drop for Var {
     }
 }
 
-pub struct EnvironmentBuilder<H: BuildHasher = DefaultHashBuilder> {
+pub struct EnvironmentBuilder<H: BuildHasher = RandomState> {
     clean: bool,
     hash_builder: H,
     table: RawTable<Var>,
@@ -140,11 +138,11 @@ pub struct EnvironmentIter<'a, H: BuildHasher> {
     inner: Result<RawIter<Var>, Vars>,
 }
 
-impl EnvironmentBuilder<DefaultHashBuilder> {
+impl EnvironmentBuilder<RandomState> {
     pub fn new() -> Self {
         Self {
             clean: false,
-            hash_builder: DefaultHashBuilder::default(),
+            hash_builder: RandomState::default(),
             table: RawTable::new(),
         }
     }
@@ -316,7 +314,7 @@ impl<'a> core::fmt::Debug for EnvironmentCapture<'a> {
     }
 }
 
-impl Default for EnvironmentBuilder<DefaultHashBuilder> {
+impl Default for EnvironmentBuilder<RandomState> {
     #[inline]
     fn default() -> Self {
         Self::new()
