@@ -3,11 +3,11 @@
 extern crate alloc as alloc_crate;
 
 #[cfg(unix)]
-mod unix;
+#[path = "unix/mod.rs"]
+pub(crate) mod sys;
 #[macro_use]
 mod macros;
-#[cfg(unix)]
-pub use unix::*;
+pub use sys::*;
 
 pub mod ffi {
     pub use alloc_crate::ffi::*;
