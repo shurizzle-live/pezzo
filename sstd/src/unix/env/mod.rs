@@ -180,3 +180,11 @@ pub fn current_dir() -> crate::io::Result<CString> {
     current_dir_in(&mut buf)?;
     Ok(unsafe { CString::from_vec_with_nul_unchecked(buf) })
 }
+
+pub fn temp_dir() -> &'static CStr {
+    #[cfg(target_os = "android")]
+    const DEFAULT: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"/data/local/tmp\0") };
+    #[cfg(not(target_os = "android"))]
+    const DEFAULT: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"/tmp\0") };
+    crate::env::var(unsafe { VarName::from_slice_unchecked(b"TMPDIR") }).unwrap_or(DEFAULT)
+}
