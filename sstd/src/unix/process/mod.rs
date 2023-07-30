@@ -202,3 +202,15 @@ pub fn current_exe() -> io::Result<CString> {
         Ok(CString::from_vec_unchecked(v))
     }
 }
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn id() -> u32 {
+    use linux_syscalls::{raw_syscall, Sysno};
+
+    unsafe { raw_syscall!([ro] Sysno::getpid) as u32 }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn id() -> u32 {
+    unsafe { libc::getpid() as u32 }
+}
