@@ -7,15 +7,15 @@ pub(crate) trait ErrorExt {
 mod imp {
     pub use sstd::io::{AsRawFd, BufRead, BufReader, Error, ErrorKind, RawFd, Read, Result};
 
-    impl super::ErrorExt for crate::Errno {
+    impl super::ErrorExt for sstd::io::Errno {
         #[inline]
         fn is_interrupted(&self) -> bool {
-            *self == crate::Errno::EINTR
+            *self == sstd::io::Errno::EINTR
         }
 
         #[inline]
         fn would_block(&self) -> bool {
-            *self == crate::Errno::EAGAIN
+            *self == sstd::io::Errno::EAGAIN
         }
     }
 }

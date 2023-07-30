@@ -354,6 +354,7 @@ impl DirBuilder {
 
     #[cfg(not(any(target_os = "linux", target_os = "android")))]
     fn mkdir(&self, path: &CStr) -> crate::io::Result<()> {
+        #[allow(clippy::useless_conversion)]
         if unsafe { libc::mkdir(path.as_ptr(), self.mode.into()) } == -1 {
             Err(crate::io::Error::last_os_error())
         } else {

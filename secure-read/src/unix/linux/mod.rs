@@ -2,8 +2,6 @@ mod noecho;
 mod nonblock;
 mod poll;
 
-pub use linux_syscalls::Errno;
-
 use core::mem::MaybeUninit;
 
 use linux_syscalls::{syscall, Sysno};

@@ -196,6 +196,34 @@ cfg_if::cfg_if! {
             }
         }
 
+        impl Seek for File {
+            fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
+                let (offset, whence) = match pos {
+                    SeekFrom::Start(offset) => (offset as i64, libc::SEEK_SET),
+                    SeekFrom::End(offset) => (offset, libc::SEEK_END),
+                    SeekFrom::Current(offset) => (offset, libc::SEEK_CUR),
+                };
+
+                loop {
+                    match unsafe { libc::lseek(self.fd, offset, whence) } {
+                        -1 => {
+                            let err = crate::io::Error::last_os_error();
+                            if err.kind() != crate::io::ErrorKind::Interrupted {
+                                return Err(err);
+                            }
+                        }
+                        len => return Ok(len as u64),
+                    }
+                }
+            }
+        }
+
+        impl Drop for File {
+            fn drop(&mut self) {
+                unsafe { libc::close(self.fd) };
+            }
+        }
+
         impl FileExt for File {
             fn lock_shared(&mut self) -> crate::io::Result<()> {
                 if unsafe { libc::flock(self.as_raw_fd(), libc::LOCK_SH) } == -1 {

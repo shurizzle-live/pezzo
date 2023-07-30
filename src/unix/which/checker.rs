@@ -1,5 +1,4 @@
-use alloc_crate::{boxed::Box, vec::Vec};
-use core::ffi::CStr;
+use sstd::{ffi::CStr, prelude::rust_2021::*};
 
 pub trait Checker {
     fn is_valid(&self, path: &CStr) -> bool;
@@ -63,7 +62,7 @@ impl Checker for ExistedChecker {
 
     #[cfg(not(target_os = "linux"))]
     fn is_valid(&self, path: &CStr) -> bool {
-        use std::mem::MaybeUninit;
+        use sstd::mem::MaybeUninit;
 
         let mut buf = MaybeUninit::<libc::stat>::uninit();
         if unsafe { libc::stat(path.as_ptr().cast(), buf.as_mut_ptr()) } == -1 {

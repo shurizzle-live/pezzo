@@ -13,6 +13,7 @@ const DEFAULT_BUF_SIZE: usize = if cfg!(target_os = "espidf") {
 };
 
 mod raw {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     use linux_syscalls::{syscall, Sysno};
 
     use crate::io::{AsRawFd, Errno, RawFd, Read, Result, Write};

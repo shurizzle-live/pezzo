@@ -85,7 +85,7 @@ where
 #[inline]
 fn check_tty(fd: io::RawFd) -> io::Result<()> {
     if !fd.is_terminal() {
-        Err(Errno::ENOTTY.into())
+        Err(sstd::io::Errno::ENOTTY.into())
     } else {
         Ok(())
     }

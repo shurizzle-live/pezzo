@@ -17,7 +17,7 @@ pub mod ffi {
 pub use alloc_crate::{borrow, boxed, rc, string, vec};
 pub use core::{
     cell, clone, cmp, convert, default, fmt, hash, iter, marker, mem, ops, option, ptr, result,
-    sync,
+    slice, str, sync,
 };
 pub mod collections;
 

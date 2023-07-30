@@ -10,7 +10,7 @@ cfg_if::cfg_if! {
 
         pub fn hostname() -> CString {
             unsafe {
-                let mut buf = Vec::<u8>::with_capacity(1024);
+                let mut buf = sstd::vec::Vec::<u8>::with_capacity(1024);
                 while {
                     let res = libc::gethostname(buf.as_mut_ptr().cast(), buf.capacity());
 

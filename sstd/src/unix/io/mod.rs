@@ -6,7 +6,10 @@ mod stdio;
 pub use error::*;
 pub use stdio::*;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub use linux_stat::RawFd;
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub type RawFd = libc::c_int;
 
 use alloc_crate::vec::Vec;
 

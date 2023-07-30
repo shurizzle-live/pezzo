@@ -2,8 +2,6 @@ mod noecho;
 mod nonblock;
 mod poll;
 
-pub use unix_clock::Errno;
-
 use core::mem::MaybeUninit;
 
 pub(crate) fn is_terminal(fd: crate::io::RawFd) -> bool {

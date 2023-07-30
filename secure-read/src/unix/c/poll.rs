@@ -1,6 +1,7 @@
-use unix_clock::Instant;
-
-use crate::{io, Errno};
+use sstd::{
+    io::{self, Errno},
+    time::Instant,
+};
 
 #[inline(always)]
 fn poll_read_inf(fd: io::RawFd) -> Result<(), Errno> {

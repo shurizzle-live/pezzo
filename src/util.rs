@@ -1,6 +1,6 @@
 cfg_if::cfg_if! {
     if #[cfg(unix)] {
-        use alloc_crate::vec::Vec;
+        use sstd::prelude::rust_2021::*;
 
         cfg_if::cfg_if! {
             if #[cfg(target_os = "linux")] {
@@ -26,12 +26,10 @@ cfg_if::cfg_if! {
                     Ok(buf)
                 }
             } else {
-                pub fn slurp_cstr<P: AsRef<crate::ffi::CStr>>(path: P) -> std::io::Result<Vec<u8>> {
-                    use std::io::{Read, AsRawFd};
-                    use tty_info::Errno;
-                    use std::mem::MaybeUninit;
+                pub fn slurp_cstr<P: AsRef<sstd::ffi::CStr>>(path: P) -> sstd::io::Result<Vec<u8>> {
+                    use sstd::{io::{Read, AsRawFd, Errno}, mem::MaybeUninit};
 
-                    let mut f = crate::fs::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
+                    let mut f = sstd::fs::OpenOptions::new().read(true).open_cstr(path.as_ref())?;
                     let len = 'stat: loop {
                         let mut buf = MaybeUninit::<libc::stat>::uninit();
                         match unsafe {
@@ -49,7 +47,7 @@ cfg_if::cfg_if! {
 
                     let mut buf = Vec::<u8>::with_capacity(len);
                     unsafe {
-                        f.read_exact(std::slice::from_raw_parts_mut(buf.as_mut_ptr(), len))?;
+                        f.read_exact(sstd::slice::from_raw_parts_mut(buf.as_mut_ptr(), len))?;
                         buf.set_len(len);
                     }
 

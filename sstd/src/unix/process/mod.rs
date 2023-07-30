@@ -20,13 +20,12 @@ mod exit;
 
 pub use exit::*;
 
-use crate::{
-    ffi::{CStr, CString},
-    io,
-};
+use crate::{ffi::CString, io};
 
 #[cfg(target_os = "linux")]
 pub fn current_exe() -> io::Result<CString> {
+    use crate::ffi::CStr;
+
     match crate::fs::read_link::<&'static CStr>(unsafe {
         CStr::from_bytes_with_nul_unchecked(b"/proc/self/exe\0")
     }) {
@@ -45,6 +44,8 @@ pub fn current_exe() -> io::Result<CString> {
     target_os = "tvos"
 ))]
 pub fn current_exe() -> io::Result<CString> {
+    use crate::vec::Vec;
+
     unsafe {
         let mut sz: u32 = 0;
         libc::_NSGetExecutablePath(core::ptr::null_mut(), &mut sz);
