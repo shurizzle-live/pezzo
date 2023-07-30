@@ -11,14 +11,23 @@ pub use var_name::*;
 #[used]
 static mut ARGS: &[*const u8] = &[];
 #[used]
-static mut ENV: *const *const u8 = core::ptr::null();
+static mut ENV: &[*const u8] = &[];
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe fn init(argc: isize, argv: *const *const u8, envp: *const *const u8) {
     ARGS = core::slice::from_raw_parts(argv, argc as _);
-    ENV = envp;
+    let auxv = {
+        let mut ptr = envp;
+        let mut env_len = 0;
+        while !(*ptr).is_null() {
+            ptr = ptr.add(1);
+            env_len += 1;
+        }
+        ENV = core::slice::from_raw_parts(envp, env_len);
+        ptr.add(1).cast()
+    };
     #[cfg(target_os = "linux")]
-    linux_syscalls::init_from_environ(envp);
+    linux_syscalls::init_from_auxv(auxv);
 }
 
 pub fn args() -> &'static [*const u8] {
@@ -54,64 +63,75 @@ pub(self) fn strip_var_name(mut s: *const u8, pref: &VarName) -> Option<*const u
 
 pub fn var(name: &VarName) -> Option<&'static CStr> {
     unsafe {
-        if ENV.is_null() {
-            return None;
-        }
-        let mut ptr = ENV;
-        while !(*ptr).is_null() {
-            if let Some(var) = strip_var_name(*ptr, name) {
-                return Some(CStr::from_ptr(var.cast()));
+        for raw_var in ENV.iter().copied() {
+            if let Some(value) = strip_var_name(raw_var, name) {
+                return Some(CStr::from_ptr(value.cast()));
             }
-            ptr = ptr.add(1);
         }
         None
     }
 }
 
-pub struct Vars(*const *const u8);
+fn split_var(mut ptr: *const u8) -> (&'static VarName, &'static CStr) {
+    let name = ptr;
+
+    unsafe {
+        loop {
+            if *ptr == 0 {
+                return (
+                    VarName::from_raw_parts(name, (ptr as usize) - (name as usize)),
+                    CStr::from_ptr(ptr.cast()),
+                );
+            }
+
+            if *ptr == b'=' {
+                return (
+                    VarName::from_raw_parts(name, (ptr as usize) - (name as usize)),
+                    CStr::from_ptr(ptr.add(1).cast()),
+                );
+            }
+
+            ptr = ptr.add(1);
+        }
+    }
+}
+
+pub struct Vars(core::iter::Copied<core::slice::Iter<'static, *const u8>>);
 
 impl Iterator for Vars {
     type Item = (&'static VarName, &'static CStr);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.0.is_null() {
-            return None;
-        }
+        self.0.next().map(split_var)
+    }
 
-        unsafe {
-            if (*self.0).is_null() {
-                self.0 = core::ptr::null();
-                return None;
-            }
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
 
-            let name = *self.0;
-            let mut ptr = *self.0;
-            self.0 = self.0.add(1);
-            loop {
-                if *ptr == 0 {
-                    return Some((
-                        VarName::from_raw_parts(name, (ptr as usize) - (name as usize)),
-                        CStr::from_ptr(ptr.cast()),
-                    ));
-                }
+impl ExactSizeIterator for Vars {
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
-                if *ptr == b'=' {
-                    return Some((
-                        VarName::from_raw_parts(name, (ptr as usize) - (name as usize)),
-                        CStr::from_ptr(ptr.add(1).cast()),
-                    ));
-                }
+impl DoubleEndedIterator for Vars {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back().map(split_var)
+    }
 
-                ptr = ptr.add(1);
-            }
-        }
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth_back(n).map(split_var)
     }
 }
 
 impl FusedIterator for Vars {}
 
 pub fn vars() -> Vars {
-    Vars(unsafe { ENV })
+    Vars(unsafe { ENV.iter().copied() })
 }
 
 #[cfg(target_os = "linux")]

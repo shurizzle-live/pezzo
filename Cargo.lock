@@ -468,9 +468,9 @@ dependencies = [
 
 [[package]]
 name = "linux-syscalls"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "505ea392a152fe7a93c596597bfd79324cf0b9c5ce8757f6874208b9200e6ab4"
+checksum = "a33f5d4132e165f23d7967bd212145d230cff847abfd090c98275f2a57746b3f"
 dependencies = [
  "cc",
  "linux-errnos",

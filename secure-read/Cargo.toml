@@ -23,7 +23,7 @@ linux-raw-sys = "0.4.3"
 linux-errnos = { version = "0.3.4", default-features = false, features = [
   "no_std_io-compat",
 ] }
-linux-syscalls = { version = "0.3.1", default-features = false }
+linux-syscalls = { version = "0.3.2", default-features = false }
 libc = { version = "0.2.147", optional = true }
 memchr = { version = "2.5.0", optional = true }
 cfg-if = "1.0.0"
